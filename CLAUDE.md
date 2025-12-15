@@ -593,6 +593,71 @@ git commit -m "feat: add feature" --author="Claude <claude@anthropic.com>"  # Wr
 
 ---
 
+## Rule 12: Documentation and Code Standards
+
+Alfred and all agents MUST follow these rules when writing documentation and code:
+
+**Language Requirements**:
+
+1. **English Only**: ALL documentation and code comments MUST be written in English
+   - README.md, docs/*.md, SPEC documents - all in English
+   - Code comments (inline, block, JSDoc, docstrings) - all in English
+   - Exception: User-facing UI text may use the configured conversation_language
+
+2. **No Korean in Technical Documents**: Technical documentation must be English-only
+   - ❌ Wrong: `// 사용자 인증 처리`
+   - ✅ Correct: `// Handle user authentication`
+
+**Documentation Quality Standards**:
+
+1. **No Duplicate Content**: Never repeat the same information across documents
+   - Each document should have a single source of truth
+   - Use cross-references instead of copying content
+   - Example: "See [tech.md](./tech.md) for implementation details"
+
+2. **Clear Organization**: Organize content by category for easy reading
+   - Use consistent heading hierarchy (h1 > h2 > h3)
+   - Group related items together
+   - Use tables for structured comparisons
+   - Use bullet points for lists
+
+3. **Human Readability**: Documents must be easy for humans to read
+   - Write clear, concise sentences
+   - Avoid unnecessary jargon
+   - Include examples where helpful
+   - Use proper formatting (code blocks, emphasis, lists)
+
+**Document Role Separation**:
+
+| Document | Role | Content Focus |
+|----------|------|---------------|
+| product.md | WHAT/WHY | Requirements, goals, user stories |
+| structure.md | WHERE | Architecture, directory structure |
+| tech.md | HOW | Implementation details, API specs |
+
+**Example**:
+
+```markdown
+# Wrong - Duplicated content
+## product.md
+Docker Compose uses YAML Anchors pattern...
+[detailed explanation]
+
+## tech.md
+Docker Compose uses YAML Anchors pattern...
+[same detailed explanation repeated]
+
+# Correct - Cross-reference
+## product.md
+Docker Compose infrastructure setup. See [tech.md](./tech.md#docker-compose) for details.
+
+## tech.md
+### Docker Compose
+[single source of detailed explanation]
+```
+
+---
+
 ## Alfred Quick Reference (Zero-Dependency)
 
 **Behavioral Constraints**:
