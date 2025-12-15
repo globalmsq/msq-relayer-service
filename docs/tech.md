@@ -1,136 +1,136 @@
-# MSQ Relayer Service - 기술 문서
+# MSQ Relayer Service - Technical Document
 
-## 문서 정보
-- **버전**: 12.2
-- **최종 수정일**: 2025-12-15
-- **상태**: Phase 1 구현 단계 (Direct + Gasless + Multi-Relayer Pool)
+## Document Information
+- **Version**: 12.2
+- **Last Updated**: 2025-12-15
+- **Status**: Phase 1 Implementation (Direct + Gasless + Multi-Relayer Pool)
 
-> **참고**: 이 문서는 기술 구현 상세(HOW)를 다룹니다.
-> - 비즈니스 요구사항(WHAT/WHY): [product.md](./product.md)
-> - 시스템 아키텍처(WHERE): [structure.md](./structure.md)
+> **Note**: This document covers technical implementation details (HOW).
+> - Business requirements (WHAT/WHY): [product.md](./product.md)
+> - System architecture (WHERE): [structure.md](./structure.md)
 
-> **참고**: MSQ Relayer Service는 **B2B Infrastructure**입니다. 이 문서의 모든 API 사용법은 Client Services (결제 시스템, 에어드랍 시스템, NFT 서비스 등)가 Relayer API를 호출하는 패턴을 기준으로 작성되었습니다. API 문서는 Swagger UI (`/api/docs`)에서 확인할 수 있습니다.
+> **Note**: MSQ Relayer Service is a **B2B Infrastructure**. All API usage patterns in this document are written based on Client Services (Payment system, Airdrop system, NFT service, etc.) calling the Relayer API. API documentation is available at Swagger UI (`/api/docs`).
 
-### 관련 문서
-- [제품 요구사항](./product.md) - WHAT/WHY
-- [시스템 아키텍처](./structure.md) - WHERE
+### Related Documents
+- [Product Requirements](./product.md) - WHAT/WHY
+- [System Architecture](./structure.md) - WHERE
 - [Task Master PRD](../.taskmaster/docs/prd.txt)
 
 ---
 
-## 기술 스택 개요
+## Technical Stack Overview
 
-Blockchain Transaction Relayer System의 기술 스택 및 구현 사양을 정의합니다.
+Defines the technical stack and implementation specifications for the Blockchain Transaction Relayer System.
 
-**v3.0 핵심 변경**: OZ 오픈소스(Relayer v1.3.0, Monitor v1.1.0)를 핵심으로 활용하여 개발 기간 50% 단축
+**v3.0 Key Changes**: 50% development time reduction by leveraging OZ open-source (Relayer v1.3.0, Monitor v1.1.0) as core components
 
-### 구현 범위
+### Implementation Scope
 
-| Phase | 기술 범위 | 상태 |
-|-------|----------|------|
-| **Phase 1** | OZ Relayer, Redis, NestJS (Auth, Direct TX, Gasless TX, EIP-712 검증, Health, Status Polling), ERC2771Forwarder | 🔄 구현 중 |
-| **Phase 2+** | TX History (MySQL), Webhook Handler, Queue System (Redis/SQS), OZ Monitor, Policy Engine | 📋 계획됨 |
+| Phase | Technical Scope | Status |
+|-------|-----------------|--------|
+| **Phase 1** | OZ Relayer, Redis, NestJS (Auth, Direct TX, Gasless TX, EIP-712 Verification, Health, Status Polling), ERC2771Forwarder | In Progress |
+| **Phase 2+** | TX History (MySQL), Webhook Handler, Queue System (Redis/SQS), OZ Monitor, Policy Engine | Planned |
 
 ---
 
-## 1. Core Services 기술 스택 (OZ Open Source)
+## 1. Core Services Technical Stack (OZ Open Source)
 
 ### 1.1 OZ Relayer v1.3.0
 
 | Category | Technology | Version | Rationale |
 |----------|------------|---------|-----------|
-| Language | Rust | - | 고성능, 메모리 안전성 |
+| Language | Rust | - | High performance, memory safety |
 | Container | Docker | - | ghcr.io/openzeppelin/openzeppelin-relayer:v1.3.0 |
-| License | AGPL-3.0 | - | 수정 시 소스 공개 필요 |
-| Queue | Redis | 7.x | OZ Relayer 네이티브 지원 |
+| License | AGPL-3.0 | - | Source disclosure required for modifications |
+| Queue | Redis | 7.x | OZ Relayer native support |
 | Key Management | Local keystore / AWS KMS | - | Local: docker/keys/, Prod: AWS KMS |
 
-**내장 기능**:
-- 트랜잭션 중계 및 서명
-- Nonce 자동 관리
-- Gas 추정 및 조정
-- 재시도 로직
-- Webhook 알림
+**Built-in Features**:
+- Transaction relay and signing
+- Automatic Nonce management
+- Gas estimation and adjustment
+- Retry logic
+- Webhook notifications
 
 ### 1.2 OZ Monitor v1.1.0 (Phase 2+)
 
 | Category | Technology | Version | Rationale |
 |----------|------------|---------|-----------|
-| Language | Rust | - | 고성능, 메모리 안전성 |
+| Language | Rust | - | High performance, memory safety |
 | Container | Docker | - | ghcr.io/openzeppelin/openzeppelin-monitor:v1.1.0 |
-| License | AGPL-3.0 | - | 수정 시 소스 공개 필요 |
+| License | AGPL-3.0 | - | Source disclosure required for modifications |
 
-**내장 기능**:
-- 블록체인 이벤트 감지
-- 잔액 모니터링
-- Slack/Discord/Telegram/Webhook 알림
-- 커스텀 트리거 스크립트 (Python/JS/Bash)
-
----
-
-## 2. API Gateway 기술 스택 (Custom Development)
-
-| Category | Technology | Version | Rationale |
-|----------|------------|---------|-----------|
-| Runtime | Node.js | 20 LTS | 광범위한 Web3 라이브러리 지원 |
-| Framework | NestJS | 10.x | 모듈화, DI, 타입 안정성 |
-| Language | TypeScript | 5.x | 타입 안전성, 개발자 경험 |
-| Blockchain | ethers.js | 6.x | EIP-712 서명 검증용 |
-| ORM | Prisma (Phase 2+) | 5.x | Type-safe DB 접근 |
-| Validation | class-validator | 0.14.x | DTO 검증 |
-| Documentation | Swagger/OpenAPI | 3.x | API 문서화 |
+**Built-in Features**:
+- Blockchain event detection
+- Balance monitoring
+- Slack/Discord/Telegram/Webhook notifications
+- Custom trigger scripts (Python/JS/Bash)
 
 ---
 
-## 3. Smart Contracts 기술 스택
+## 2. API Gateway Technical Stack (Custom Development)
 
 | Category | Technology | Version | Rationale |
 |----------|------------|---------|-----------|
-| Library | OpenZeppelin Contracts | 5.3.0 | 검증된 보안, 커뮤니티 표준 |
-| Framework | Hardhat | 2.x | 개발/테스트/배포 통합 |
-| Language | Solidity | 0.8.20 | OZ v5 호환 |
-| Testing | Hardhat Toolbox | 4.x | 테스트 유틸리티 |
+| Runtime | Node.js | 20 LTS | Extensive Web3 library support |
+| Framework | NestJS | 10.x | Modularization, DI, type safety |
+| Language | TypeScript | 5.x | Type safety, developer experience |
+| Blockchain | ethers.js | 6.x | EIP-712 signature verification |
+| ORM | Prisma (Phase 2+) | 5.x | Type-safe DB access |
+| Validation | class-validator | 0.14.x | DTO validation |
+| Documentation | Swagger/OpenAPI | 3.x | API documentation |
 
-### 3.1 OpenZeppelin 컨트랙트 활용
+---
 
-**커스텀 컨트랙트 최소화, OpenZeppelin 검증된 코드 최대 활용**
+## 3. Smart Contracts Technical Stack
 
-| 구분 | 사용할 컨트랙트 | 출처 |
-|------|----------------|------|
+| Category | Technology | Version | Rationale |
+|----------|------------|---------|-----------|
+| Library | OpenZeppelin Contracts | 5.3.0 | Proven security, community standard |
+| Framework | Hardhat | 2.x | Development/Testing/Deployment integration |
+| Language | Solidity | 0.8.20 | OZ v5 compatible |
+| Testing | Hardhat Toolbox | 4.x | Testing utilities |
+
+### 3.1 OpenZeppelin Contract Usage
+
+**Minimize custom contracts, maximize usage of OpenZeppelin verified code**
+
+| Category | Contract to Use | Source |
+|----------|-----------------|--------|
 | **Forwarder** | `ERC2771Forwarder` | @openzeppelin/contracts v5.3.0 |
 | **Target Context** | `ERC2771Context` | @openzeppelin/contracts v5.3.0 |
-| **보안 제어** | Policy Engine | NestJS API Gateway (커스텀) |
+| **Security Control** | Policy Engine | NestJS API Gateway (custom) |
 
-### 3.2 ERC2771Forwarder 기능
+### 3.2 ERC2771Forwarder Features
 
-OZ ERC2771Forwarder는 다음 기능을 제공합니다 (100% OZ 코드 그대로 사용):
+OZ ERC2771Forwarder provides the following features (using 100% OZ code as-is):
 
-- EIP-712 서명 검증
-- Nonce 관리 (Nonces.sol)
-- Deadline 검증
-- `execute()` - 단건 실행
-- `executeBatch()` - 다건 실행
-- `verify()` - 서명 검증
-- `nonces(address)` - nonce 조회
+- EIP-712 signature verification
+- Nonce management (Nonces.sol)
+- Deadline verification
+- `execute()` - Single execution
+- `executeBatch()` - Batch execution
+- `verify()` - Signature verification
+- `nonces(address)` - Nonce query
 
-### 3.3 ForwardRequest 구조체
+### 3.3 ForwardRequest Structure
 
 ```solidity
 struct ForwardRequestData {
-    address from;      // 원본 사용자 주소
-    address to;        // 대상 컨트랙트 주소
-    uint256 value;     // ETH 전송량
-    uint256 gas;       // 가스 한도
-    uint256 nonce;     // 사용자 nonce
-    uint48 deadline;   // 유효 기간
-    bytes data;        // 함수 호출 데이터
-    bytes signature;   // EIP-712 서명
+    address from;      // Original user address
+    address to;        // Target contract address
+    uint256 value;     // ETH transfer amount
+    uint256 gas;       // Gas limit
+    uint256 nonce;     // User nonce
+    uint48 deadline;   // Validity period
+    bytes data;        // Function call data
+    bytes signature;   // EIP-712 signature
 }
 ```
 
 ---
 
-## 4. Infrastructure 기술 스택
+## 4. Infrastructure Technical Stack
 
 | Category | Local | Production |
 |----------|-------|------------|
@@ -146,14 +146,14 @@ struct ForwardRequestData {
 
 ---
 
-## 5. API 사양
+## 5. API Specifications
 
-> **API 응답 형식 표준**: 모든 성공 응답은 아래 표준 형식을 따릅니다. 에러 응답 형식은 Section 5.6을 참조하세요.
+> **API Response Format Standard**: All success responses follow the standard format below. For error response format, refer to Section 5.6.
 >
 > ```json
 > {
 >   "success": true,
->   "data": { /* 엔드포인트별 응답 데이터 */ },
+>   "data": { /* Response data per endpoint */ },
 >   "timestamp": "2025-12-15T00:00:00.000Z"
 > }
 > ```
@@ -167,12 +167,12 @@ X-API-Key: {api_key}
 
 Request:
 {
-  "to": "0x...",           # 대상 컨트랙트 주소
+  "to": "0x...",           # Target contract address
   "data": "0x...",         # Encoded function call
-  "value": "0",            # ETH 전송량 (wei)
-  "gasLimit": "200000",    # Optional: 가스 한도
+  "value": "0",            # ETH transfer amount (wei)
+  "gasLimit": "200000",    # Optional: Gas limit
   "speed": "average",      # Optional: safeLow|average|fast|fastest
-  "metadata": {            # Optional: 추적용 메타데이터
+  "metadata": {            # Optional: Tracking metadata
     "jobId": "airdrop-001",
     "batchIndex": 1
   }
@@ -182,9 +182,9 @@ Response (202 Accepted):
 {
   "success": true,
   "data": {
-    "txId": "tx_abc123def456",       # 내부 트랜잭션 ID
+    "txId": "tx_abc123def456",       # Internal transaction ID
     "status": "pending",             # pending|submitted|confirmed|failed
-    "relayerId": "oz-relayer-1",     # 할당된 Relayer ID
+    "relayerId": "oz-relayer-1",     # Assigned Relayer ID
     "createdAt": "2025-12-15T00:00:00.000Z"
   },
   "timestamp": "2025-12-15T00:00:00.000Z"
@@ -201,15 +201,15 @@ X-API-Key: {api_key}
 Request:
 {
   "request": {
-    "from": "0x...",       # 사용자 주소
-    "to": "0x...",         # 대상 컨트랙트 주소
-    "value": "0",          # ETH 전송량 (보통 "0")
-    "gas": "200000",       # 가스 한도
-    "nonce": "5",          # Forwarder 기준 사용자 nonce
-    "deadline": 1702400000,# 유효 기간 (Unix timestamp)
+    "from": "0x...",       # User address
+    "to": "0x...",         # Target contract address
+    "value": "0",          # ETH transfer amount (usually "0")
+    "gas": "200000",       # Gas limit
+    "nonce": "5",          # Forwarder-based user nonce
+    "deadline": 1702400000,# Validity period (Unix timestamp)
     "data": "0x..."        # Encoded function call
   },
-  "signature": "0x...",    # EIP-712 서명
+  "signature": "0x...",    # EIP-712 signature
   "metadata": {
     "sponsorId": "default-sponsor",
     "clientId": "web-app"
@@ -220,17 +220,17 @@ Response (202 Accepted):
 {
   "success": true,
   "data": {
-    "txId": "tx_xyz789ghi012",                              # 내부 트랜잭션 ID
+    "txId": "tx_xyz789ghi012",                              # Internal transaction ID
     "status": "pending",                                    # pending|submitted|confirmed|failed
-    "forwarder": "0xERC2771ForwarderAddress...",            # Forwarder 컨트랙트 주소
-    "originalSender": "0xUserAddress...",                   # 원본 사용자 주소
-    "relayerId": "oz-relayer-2"                             # 할당된 Relayer ID
+    "forwarder": "0xERC2771ForwarderAddress...",            # Forwarder contract address
+    "originalSender": "0xUserAddress...",                   # Original user address
+    "relayerId": "oz-relayer-2"                             # Assigned Relayer ID
   },
   "timestamp": "2025-12-15T00:00:00.000Z"
 }
 ```
 
-### 5.3 Nonce 조회 API
+### 5.3 Nonce Query API
 
 ```yaml
 GET /api/v1/relay/nonce/{userAddress}?network=polygon
@@ -239,16 +239,16 @@ Response (200 OK):
 {
   "success": true,
   "data": {
-    "address": "0x...",             # 사용자 주소
-    "nonce": "5",                   # 현재 Forwarder nonce
-    "network": "polygon",           # 네트워크 이름
-    "forwarder": "0x..."            # Forwarder 컨트랙트 주소
+    "address": "0x...",             # User address
+    "nonce": "5",                   # Current Forwarder nonce
+    "network": "polygon",           # Network name
+    "forwarder": "0x..."            # Forwarder contract address
   },
   "timestamp": "2025-12-15T00:00:00.000Z"
 }
 ```
 
-### 5.4 Status 조회 API
+### 5.4 Status Query API
 
 ```yaml
 GET /api/v1/relay/status/{txId}
@@ -257,13 +257,13 @@ Response (200 OK):
 {
   "success": true,
   "data": {
-    "txId": "tx_abc123def456",        # 내부 트랜잭션 ID
+    "txId": "tx_abc123def456",        # Internal transaction ID
     "status": "confirmed",            # pending|submitted|confirmed|failed
-    "txHash": "0x...",                # 블록체인 트랜잭션 해시
-    "blockNumber": 12345678,          # 확인된 블록 번호
-    "gasUsed": "21000",               # 사용된 가스
-    "effectiveGasPrice": "30000000000", # 실제 가스 가격
-    "confirmedAt": "2025-12-15T00:01:00.000Z"  # 확인 시간
+    "txHash": "0x...",                # Blockchain transaction hash
+    "blockNumber": 12345678,          # Confirmed block number
+    "gasUsed": "21000",               # Gas used
+    "effectiveGasPrice": "30000000000", # Actual gas price
+    "confirmedAt": "2025-12-15T00:01:00.000Z"  # Confirmation time
   },
   "timestamp": "2025-12-15T00:00:00.000Z"
 }
@@ -280,18 +280,18 @@ Response (Phase 1):
   "timestamp": "2025-12-15T00:00:00.000Z",
   "services": {
     "api-gateway": "healthy",
-    "oz-relayer-pool": "healthy",   # 3개 Relayer의 집계 상태
+    "oz-relayer-pool": "healthy",   # Aggregated status of 3 Relayers
     "redis": "healthy"
   }
 }
 
-# oz-relayer-pool 상태 판정:
-# - "healthy": 모든 Relayer가 healthy
-# - "degraded": 일부 Relayer가 unhealthy (최소 1개 healthy)
-# - "unhealthy": 모든 Relayer가 unhealthy
+# oz-relayer-pool status determination:
+# - "healthy": All Relayers are healthy
+# - "degraded": Some Relayers are unhealthy (at least 1 healthy)
+# - "unhealthy": All Relayers are unhealthy
 ```
 
-#### Relayer Pool Status Aggregation (NestJS 구현)
+#### Relayer Pool Status Aggregation (NestJS Implementation)
 
 ```typescript
 // packages/api-gateway/src/health/health.service.ts
@@ -349,7 +349,7 @@ export class HealthService {
     try {
       await firstValueFrom(
         this.httpService.get(endpoint.url).pipe(
-          timeout(5000), // 5초 타임아웃
+          timeout(5000), // 5 second timeout
           catchError(err => { throw err; })
         )
       );
@@ -385,7 +385,7 @@ export class HealthService {
 #### Detailed Health Response Example
 
 ```json
-// GET /api/v1/health - Detailed Response (degraded 상태 예시)
+// GET /api/v1/health - Detailed Response (degraded status example)
 {
   "success": true,
   "data": {
@@ -410,7 +410,7 @@ export class HealthService {
 }
 ```
 
-**Phase 2+ 확장 Health Check**:
+**Phase 2+ Extended Health Check**:
 
 ```yaml
 GET /api/v1/health
@@ -431,7 +431,7 @@ Response (Phase 2+):
 
 ### 5.6 Error Response Format
 
-모든 API 엔드포인트는 표준화된 에러 응답 형식을 사용합니다.
+All API endpoints use a standardized error response format.
 
 **Standard Error Response**:
 
@@ -519,7 +519,7 @@ Response (Phase 2+):
 
 ### 5.7 Rate Limiting (Phase 2+ Reserved)
 
-> **참고**: Phase 1에서는 Rate Limiting을 적용하지 않습니다. 아래 사양은 Phase 2+ 구현을 위해 예약되어 있습니다.
+> **Note**: Rate Limiting is not applied in Phase 1. The specifications below are reserved for Phase 2+ implementation.
 
 **Rate Limit Response Headers**:
 
@@ -548,11 +548,11 @@ X-RateLimit-Window: 3600       # Window size in seconds
 }
 ```
 
-**Phase 1 참고**: Rate limiting이 비활성화되어 있어도 헤더가 플레이스홀더 값으로 포함될 수 있습니다.
+**Phase 1 Note**: Even though rate limiting is disabled, headers may be included with placeholder values.
 
 ### 5.8 Request/Response Examples (JSON Format)
 
-각 API 엔드포인트의 상세 요청/응답 예시입니다.
+Detailed request/response examples for each API endpoint.
 
 #### 5.8.1 Direct TX (POST /api/v1/relay/direct)
 
@@ -647,7 +647,7 @@ X-RateLimit-Window: 3600       # Window size in seconds
 
 ### 5.9 Pagination (Phase 2+ Reserved)
 
-> **참고**: Phase 1 Status API는 단일 항목을 반환합니다. Pagination은 Phase 2+ TX History API를 위해 예약되어 있습니다.
+> **Note**: Phase 1 Status API returns single items. Pagination is reserved for Phase 2+ TX History API.
 
 **Pagination Query Parameters**:
 
@@ -688,15 +688,15 @@ GET /api/v1/relay/history?page=1&limit=20&sort=createdAt&order=desc
 
 ---
 
-## 6. EIP-712 TypedData 구조
+## 6. EIP-712 TypedData Structure
 
 ```typescript
-// OZ ERC2771Forwarder의 EIP-712 Domain 및 Types
+// OZ ERC2771Forwarder EIP-712 Domain and Types
 const EIP712_DOMAIN = {
-  name: "Relayer-Forwarder-polygon",  // Forwarder 배포 시 설정한 이름
+  name: "Relayer-Forwarder-polygon",  // Name set during Forwarder deployment
   version: "1",
   chainId: 137,
-  verifyingContract: "0x..."     // Forwarder 주소
+  verifyingContract: "0x..."     // Forwarder address
 };
 
 const FORWARD_REQUEST_TYPES = {
@@ -716,7 +716,7 @@ const FORWARD_REQUEST_TYPES = {
 
 ## 7. Policy Configuration (Phase 2+)
 
-### 7.1 정책 설정 파일 구조 (NestJS API Gateway)
+### 7.1 Policy Configuration File Structure (NestJS API Gateway)
 
 ```yaml
 # config/policies.yaml
@@ -725,7 +725,7 @@ policies:
     name: "Default Gasless Policy"
     enabled: true
 
-    # 허용 컨트랙트/메서드 (NestJS Policy Engine에서 검증)
+    # Allowed contracts/methods (verified by NestJS Policy Engine)
     targets:
       contracts:
         - address: "0x...ERC20_TOKEN"
@@ -735,93 +735,93 @@ policies:
         - address: "0x...ERC721_NFT"
           methods: ["mint", "safeTransferFrom"]
 
-    # 사용자 제한 (NestJS에서 검증)
+    # User restrictions (verified by NestJS)
     users:
-      whitelist: []        # 비어있으면 모두 허용
+      whitelist: []        # Empty means all allowed
       blacklist:
         - "0x...blocked_address"
 
-    # 가스 제한 (NestJS에서 검증)
+    # Gas limits (verified by NestJS)
     gas:
       maxGasLimit: "500000"
       maxPriorityFeePerGas: "50000000000"  # 50 gwei
       maxFeePerGas: "200000000000"         # 200 gwei
 
-    # 네트워크
+    # Networks
     networks: ["polygon", "amoy"]
 ```
 
 ---
 
-## 8. 스마트 컨트랙트 vs 백엔드 vs OZ 역할 분담
+## 8. Smart Contract vs Backend vs OZ Role Distribution
 
-| 보안 기능 | OZ Forwarder (온체인) | NestJS API Gateway | OZ Relayer |
-|----------|----------------------|-------------------|------------|
-| EIP-712 서명 검증 | 최종 검증 | 사전 검증 | - |
-| Nonce 관리 | 온체인 관리 (User) | 조회만 | 내장 (Relayer) |
-| Deadline 검증 | 온체인 검증 | 사전 검증 | - |
+| Security Feature | OZ Forwarder (On-chain) | NestJS API Gateway | OZ Relayer |
+|------------------|-------------------------|-------------------|------------|
+| EIP-712 Signature Verification | Final verification | Pre-validation | - |
+| Nonce Management | On-chain management (User) | Query only | Built-in (Relayer) |
+| Deadline Verification | On-chain verification | Pre-validation | - |
 | **Contract Whitelist** | - | Policy Engine | - |
 | **Method Whitelist** | - | Policy Engine | - |
 | **User Blacklist** | - | Policy Engine | - |
 | **Gas Limit Cap** | - | Policy Engine | - |
-| **Gas 추정** | - | - | 내장 |
-| **TX 서명/제출** | - | - | 내장 |
-| **재시도 로직** | - | - | 내장 |
+| **Gas Estimation** | - | - | Built-in |
+| **TX Signing/Submission** | - | - | Built-in |
+| **Retry Logic** | - | - | Built-in |
 
 ---
 
-## 9. 보안 요구사항
+## 9. Security Requirements
 
-| 항목 | 요구사항 | 구현 위치 |
-|------|----------|----------|
-| Private Key 관리 | Local keystore / AWS KMS | OZ Relayer signer config |
-| API 인증 | API Key | NestJS API Gateway |
-| 네트워크 보안 | VPC Private Subnet, Security Group | Infrastructure |
-| Contract Whitelist | 허용된 컨트랙트만 호출 | NestJS Policy Engine |
-| Method Whitelist | 허용된 메서드만 호출 | NestJS Policy Engine |
-| User Blacklist | 차단된 사용자 거부 | NestJS Policy Engine |
-| EIP-712 검증 | Signature 사전 검증 | NestJS + OZ Forwarder |
-| Nonce 검증 | Replay Attack 방지 | OZ Forwarder (온체인) |
-| Deadline 검증 | 만료 요청 거부 | NestJS + OZ Forwarder |
-| Webhook 보안 | WEBHOOK_SIGNING_KEY (Phase 2+) | OZ Relayer |
+| Item | Requirement | Implementation Location |
+|------|-------------|------------------------|
+| Private Key Management | Local keystore / AWS KMS | OZ Relayer signer config |
+| API Authentication | API Key | NestJS API Gateway |
+| Network Security | VPC Private Subnet, Security Group | Infrastructure |
+| Contract Whitelist | Allow only permitted contracts | NestJS Policy Engine |
+| Method Whitelist | Allow only permitted methods | NestJS Policy Engine |
+| User Blacklist | Reject blocked users | NestJS Policy Engine |
+| EIP-712 Verification | Signature pre-validation | NestJS + OZ Forwarder |
+| Nonce Verification | Replay attack prevention | OZ Forwarder (on-chain) |
+| Deadline Verification | Reject expired requests | NestJS + OZ Forwarder |
+| Webhook Security | WEBHOOK_SIGNING_KEY (Phase 2+) | OZ Relayer |
 
-### 9.1 API Key 인증 (Phase 1)
+### 9.1 API Key Authentication (Phase 1)
 
-**인증 방식**:
-- 단일 환경변수 `API_GATEWAY_API_KEY`로 API Key 관리
+**Authentication Method**:
+- API Key management via single environment variable `API_GATEWAY_API_KEY`
 - Header: `X-API-Key: {api_key}`
-- 환경변수 값과 일치 여부로 검증
+- Verification by matching with environment variable value
 
 ```
-Client Service → [X-API-Key 헤더] → API Gateway → [환경변수 비교] → 통과/거부
+Client Service → [X-API-Key header] → API Gateway → [Environment variable comparison] → Pass/Reject
 ```
 
-**Docker Compose 환경변수**:
+**Docker Compose Environment Variable**:
 ```yaml
 api-gateway:
   environment:
-    API_GATEWAY_API_KEY: "msq-dev-api-key-12345"  # 개발용
+    API_GATEWAY_API_KEY: "msq-dev-api-key-12345"  # Development
 ```
 
-**NestJS 모듈 구조**:
+**NestJS Module Structure**:
 ```
 packages/api-gateway/src/auth/
-├── auth.module.ts              # Global Guard 등록
+├── auth.module.ts              # Global Guard registration
 ├── guards/
-│   └── api-key.guard.ts        # X-API-Key 검증
+│   └── api-key.guard.ts        # X-API-Key verification
 └── decorators/
-    └── public.decorator.ts     # @Public() (Health Check 등 예외)
+    └── public.decorator.ts     # @Public() (exceptions like Health Check)
 ```
 
-**Phase 2+ 확장 계획**:
-- 다중 Client Service 지원
-- API Key 관리 시스템 (생성/취소/로테이션)
-- DB 기반 저장
-- Client별 권한 관리 (permissions)
+**Phase 2+ Extension Plan**:
+- Multiple Client Service support
+- API Key management system (generation/revocation/rotation)
+- DB-based storage
+- Per-client permission management
 
 ---
 
-## 10. 패키지 의존성
+## 10. Package Dependencies
 
 ### 10.1 API Gateway (NestJS)
 
@@ -866,9 +866,9 @@ packages/api-gateway/src/auth/
 
 ---
 
-## 11. OZ Relayer 설정
+## 11. OZ Relayer Configuration
 
-### 11.1 config.json 예시
+### 11.1 config.json Example
 
 ```json
 {
@@ -898,32 +898,32 @@ packages/api-gateway/src/auth/
 }
 ```
 
-### 11.2 네트워크 설정
+### 11.2 Network Configuration
 
-| Network | Chain ID | RPC URL 환경변수 |
-|---------|----------|------------------|
+| Network | Chain ID | RPC URL Environment Variable |
+|---------|----------|------------------------------|
 | Polygon Mainnet | 137 | `POLYGON_RPC_URL` |
 | Polygon Amoy | 80002 | `AMOY_RPC_URL` |
 | Ethereum Mainnet | 1 | `ETHEREUM_RPC_URL` |
 | Ethereum Sepolia | 11155111 | `SEPOLIA_RPC_URL` |
 
-### 11.3 Multi-Relayer Pool 설정
+### 11.3 Multi-Relayer Pool Configuration
 
-**Relayer Pool 방식**: 각 Relayer가 독립적인 Private Key를 보유하여 Nonce 충돌 없이 병렬 처리
+**Relayer Pool Method**: Each Relayer holds an independent Private Key for parallel processing without Nonce collision
 
-#### Pool 구성 예시
+#### Pool Configuration Example
 
 ```
 docker/config/oz-relayer/
-├── relayer-1.json       # Relayer #1 설정 (Hardhat Account #10)
-├── relayer-2.json       # Relayer #2 설정 (Hardhat Account #11)
-└── relayer-3.json       # Relayer #3 설정 (Hardhat Account #12)
+├── relayer-1.json       # Relayer #1 config (Hardhat Account #10)
+├── relayer-2.json       # Relayer #2 config (Hardhat Account #11)
+└── relayer-3.json       # Relayer #3 config (Hardhat Account #12)
 ```
 
-> **참고**: OZ Relayer는 단일 config.json 파일을 기대합니다. Docker 볼륨 마운트로 각 flat 파일을 `/app/config/config.json`으로 매핑합니다.
-> 예: `./config/oz-relayer/relayer-1.json:/app/config/config.json:ro`
+> **Note**: OZ Relayer expects a single config.json file. Docker volume mount maps each flat file to `/app/config/config.json`.
+> Example: `./config/oz-relayer/relayer-1.json:/app/config/config.json:ro`
 
-#### 개별 Relayer config.json 예시
+#### Individual Relayer config.json Example
 
 ```json
 {
@@ -953,10 +953,10 @@ docker/config/oz-relayer/
 }
 ```
 
-#### API Gateway Relayer Pool 설정
+#### API Gateway Relayer Pool Configuration
 
 ```yaml
-# config/relayer-pool.yaml (NestJS에서 로드)
+# config/relayer-pool.yaml (loaded by NestJS)
 relayer_pool:
   strategy: "round_robin"  # round_robin | least_load
   health_check:
@@ -975,28 +975,28 @@ relayer_pool:
     - id: "relayer-n"
       url: "http://oz-relayer-n:8080"
       api_key: "${OZ_RELAYER_N_API_KEY}"
-      priority: 2  # Standby (우선순위 낮음)
+      priority: 2  # Standby (lower priority)
 ```
 
-#### Load Balancing 전략
+#### Load Balancing Strategies
 
-| 전략 | 설명 | 사용 시기 |
-|------|------|----------|
-| **Round Robin** | 순차적으로 Relayer 선택 | 균등 부하 분산 필요시 |
-| **Least Load** | 대기 TX 가장 적은 Relayer 선택 | 응답 시간 최적화 필요시 |
+| Strategy | Description | Use Case |
+|----------|-------------|----------|
+| **Round Robin** | Select Relayers sequentially | When even load distribution needed |
+| **Least Load** | Select Relayer with fewest pending TXs | When response time optimization needed |
 
-#### Scaling 정책
+#### Scaling Policies
 
-| Phase | 방식 | 설명 |
-|-------|------|------|
-| **Phase 1** | Manual | Docker Compose에 Relayer 서비스 추가/제거 |
-| **Phase 2+** | Auto | Kubernetes HPA 또는 Queue Depth 기반 자동 스케일링 |
+| Phase | Method | Description |
+|-------|--------|-------------|
+| **Phase 1** | Manual | Add/remove Relayer services in Docker Compose |
+| **Phase 2+** | Auto | Kubernetes HPA or Queue Depth-based auto-scaling |
 
 ---
 
-## 12. OZ Monitor 설정 (Phase 2+)
+## 12. OZ Monitor Configuration (Phase 2+)
 
-### 12.1 네트워크 설정 예시
+### 12.1 Network Configuration Example
 
 ```json
 // config/oz-monitor/networks/polygon.json
@@ -1008,7 +1008,7 @@ relayer_pool:
 }
 ```
 
-### 12.2 모니터 설정 예시
+### 12.2 Monitor Configuration Example
 
 ```json
 // config/oz-monitor/monitors/relayer-balance.json
@@ -1025,7 +1025,7 @@ relayer_pool:
 }
 ```
 
-### 12.3 트리거 설정 예시
+### 12.3 Trigger Configuration Example
 
 ```json
 // config/oz-monitor/triggers/slack.json
@@ -1039,50 +1039,50 @@ relayer_pool:
 
 ---
 
-## 13. Docker Compose 설정 (v5.0 - SPEC-INFRA-001)
+## 13. Docker Compose Configuration (v5.0 - SPEC-INFRA-001)
 
-> **Docker Build 전략**: 멀티스테이지 빌드 방식 (docker/ 디렉토리 통합)
-> - 위치: `docker/docker-compose.yaml` (로컬 개발, Hardhat Node 포함)
-> - 위치: `docker/docker-compose-amoy.yaml` (Polygon Amoy Testnet)
-> - Dockerfile: `docker/Dockerfile.packages` (멀티스테이지 빌드, target으로 패키지 선택)
-> - 환경 변수: docker-compose.yaml에 직접 명시 (.env 파일 사용 안 함)
+> **Docker Build Strategy**: Multi-stage build approach (docker/ directory consolidation)
+> - Location: `docker/docker-compose.yaml` (local development, includes Hardhat Node)
+> - Location: `docker/docker-compose-amoy.yaml` (Polygon Amoy Testnet)
+> - Dockerfile: `docker/Dockerfile.packages` (multi-stage build, select package via target)
+> - Environment Variables: Specified directly in docker-compose.yaml (no .env file)
 
-**파일 위치**:
+**File Locations**:
 ```
 docker/
-├── docker-compose.yaml          # 메인 설정 (Hardhat Node 포함)
-├── docker-compose-amoy.yaml     # Polygon Amoy Testnet 설정
-├── Dockerfile.packages          # 멀티스테이지 빌드
+├── docker-compose.yaml          # Main configuration (includes Hardhat Node)
+├── docker-compose-amoy.yaml     # Polygon Amoy Testnet configuration
+├── Dockerfile.packages          # Multi-stage build
 ├── config/
 │   └── oz-relayer/
-│       ├── relayer-1.json       # Relayer #1 설정 (flat 파일)
-│       ├── relayer-2.json       # Relayer #2 설정
-│       └── relayer-3.json       # Relayer #3 설정
-├── keys-example/                # 샘플 키스토어 (Git 포함)
+│       ├── relayer-1.json       # Relayer #1 config (flat file)
+│       ├── relayer-2.json       # Relayer #2 config
+│       └── relayer-3.json       # Relayer #3 config
+├── keys-example/                # Sample keystores (included in Git)
 │   ├── relayer-1/keystore.json  # Hardhat Account #10
 │   ├── relayer-2/keystore.json  # Hardhat Account #11
 │   └── relayer-3/keystore.json  # Hardhat Account #12
-└── keys/                        # 실제 키스토어 (.gitignore)
+└── keys/                        # Actual keystores (.gitignore)
 ```
 
-**실행 명령**:
+**Execution Commands**:
 ```bash
-# 로컬 개발 (Hardhat Node)
+# Local development (Hardhat Node)
 docker compose -f docker/docker-compose.yaml up -d
 
-# Polygon Amoy 테스트넷
+# Polygon Amoy Testnet
 docker compose -f docker/docker-compose-amoy.yaml up -d
 ```
 
 ```yaml
-# docker/docker-compose.yaml (Hardhat Node 로컬 개발)
+# docker/docker-compose.yaml (Hardhat Node local development)
 version: '3.8'
 
-# === Top-level anchors (services 외부에 정의) ===
-# 참고: YAML Anchors는 반드시 services: 블록 외부 최상위 레벨에 정의해야 합니다.
-# deploy.replicas 대신 개별 서비스를 정의합니다.
-# 이유: 각 Relayer는 고유 Private Key가 필요 (Nonce 충돌 방지)
-# YAML Anchors로 공통 설정을 재사용하여 중복을 최소화합니다.
+# === Top-level anchors (defined outside services) ===
+# Note: YAML Anchors must be defined at top-level outside the services: block.
+# Individual services are defined instead of deploy.replicas.
+# Reason: Each Relayer needs a unique Private Key (to prevent Nonce collision)
+# YAML Anchors reuse common configuration to minimize duplication.
 
 x-relayer-common: &relayer-common
   image: ghcr.io/openzeppelin/openzeppelin-relayer:v1.3.0
@@ -1101,9 +1101,9 @@ x-relayer-common: &relayer-common
   networks:
     - msq-relayer-network
 
-# === Services block (anchors 정의 후) ===
+# === Services block (after anchors definition) ===
 services:
-  # === 로컬 블록체인 (Phase 1 필수) ===
+  # === Local Blockchain (Phase 1 Required) ===
   hardhat-node:
     build:
       context: ..
@@ -1214,14 +1214,14 @@ volumes:
   msq-relayer-redis-data:
 ```
 
-**환경 변수 전략**:
-- ❌ ~~.env 파일 사용~~ (SPEC-INFRA-001에서 제거)
-- ✅ docker-compose.yaml에 환경 변수 직접 명시
-- ✅ 네트워크별 설정 파일 분리 (docker-compose.yaml, docker-compose-amoy.yaml)
+**Environment Variable Strategy**:
+- ~~.env file usage~~ (removed in SPEC-INFRA-001)
+- Environment variables specified directly in docker-compose.yaml
+- Separate configuration files per network (docker-compose.yaml, docker-compose-amoy.yaml)
 
 ---
 
-## 14. Hardhat 설정
+## 14. Hardhat Configuration
 
 ```typescript
 // hardhat.config.ts
@@ -1283,9 +1283,9 @@ export default config;
 
 ## 15. Queue System (Phase 2+)
 
-> **QUEUE_PROVIDER 패턴**: 환경에 따라 Redis+BullMQ 또는 AWS SQS를 선택적으로 사용할 수 있습니다.
+> **QUEUE_PROVIDER Pattern**: Selectively use Redis+BullMQ or AWS SQS depending on environment.
 
-### 15.1 Queue 아키텍처
+### 15.1 Queue Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -1294,27 +1294,27 @@ export default config;
 │  │                   Queue Adapter                        │  │
 │  │  ┌─────────────────┐    ┌─────────────────────────┐   │  │
 │  │  │ QUEUE_PROVIDER  │────│ Redis+BullMQ (default)  │   │  │
-│  │  │ 환경변수         │    │ AWS SQS (production)    │   │  │
+│  │  │ env variable    │    │ AWS SQS (production)    │   │  │
 │  │  └─────────────────┘    └─────────────────────────┘   │  │
 │  └───────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 15.2 Provider 비교
+### 15.2 Provider Comparison
 
-| 항목 | Redis + BullMQ | AWS SQS |
+| Item | Redis + BullMQ | AWS SQS |
 |------|----------------|---------|
-| 사용 환경 | 로컬/개발/테스트 | 프로덕션 |
-| 설정 복잡도 | 낮음 | 중간 |
-| 비용 | 인프라 비용만 | 요청당 과금 |
-| 확장성 | 수평 확장 필요 | 자동 확장 |
-| 메시지 보존 | 휘발성 (설정 가능) | 4일 기본 보존 |
-| 지연 시간 | 매우 낮음 | 낮음 |
+| Environment | Local/Dev/Test | Production |
+| Configuration Complexity | Low | Medium |
+| Cost | Infrastructure only | Per-request billing |
+| Scalability | Requires horizontal scaling | Auto-scaling |
+| Message Retention | Volatile (configurable) | 4-day default retention |
+| Latency | Very low | Low |
 
-### 15.3 환경 설정
+### 15.3 Environment Configuration
 
 ```bash
-# .env 파일
+# .env file
 # Redis (default)
 QUEUE_PROVIDER=redis
 REDIS_URL=redis://localhost:6379
@@ -1325,7 +1325,7 @@ AWS_REGION=ap-northeast-2
 AWS_SQS_QUEUE_URL=https://sqs.ap-northeast-2.amazonaws.com/123456789012/relayer-queue
 ```
 
-### 15.4 Queue Adapter 인터페이스
+### 15.4 Queue Adapter Interface
 
 ```typescript
 // packages/api-gateway/src/queue/queue-adapter.interface.ts
@@ -1352,12 +1352,12 @@ interface JobStatus {
 }
 ```
 
-### 15.5 API 변경 사항 (Queue 모드)
+### 15.5 API Changes (Queue Mode)
 
-Queue 시스템 활성화 시 API 응답이 변경됩니다:
+API responses change when Queue system is enabled:
 
 ```yaml
-# Queue 비활성화 (Phase 1 - 즉시 처리)
+# Queue disabled (Phase 1 - immediate processing)
 POST /api/v1/relay/direct
 Response (200 OK):
 {
@@ -1366,7 +1366,7 @@ Response (200 OK):
   "status": "submitted"
 }
 
-# Queue 활성화 (Phase 2+ - 비동기 처리)
+# Queue enabled (Phase 2+ - async processing)
 POST /api/v1/relay/direct
 Response (202 Accepted):
 {
@@ -1375,7 +1375,7 @@ Response (202 Accepted):
   "estimatedWait": "5s"
 }
 
-# Job 상태 조회
+# Job status query
 GET /api/v1/relay/job/{jobId}
 Response:
 {
@@ -1386,7 +1386,7 @@ Response:
 }
 ```
 
-### 15.6 Redis + BullMQ 설정
+### 15.6 Redis + BullMQ Configuration
 
 ```typescript
 // packages/api-gateway/src/queue/redis-queue.adapter.ts
@@ -1407,7 +1407,7 @@ const relayQueue = new Queue('relay-jobs', {
 });
 ```
 
-### 15.7 AWS SQS 설정
+### 15.7 AWS SQS Configuration
 
 ```typescript
 // packages/api-gateway/src/queue/sqs-queue.adapter.ts
@@ -1422,61 +1422,61 @@ const queueUrl = process.env.AWS_SQS_QUEUE_URL;
 
 ---
 
-## 16. 라이선스 고려사항
+## 16. License Considerations
 
 ### 16.1 OZ Relayer / OZ Monitor: AGPL-3.0
 
-| 사용 시나리오 | 의무사항 |
-|--------------|----------|
-| 내부 사용 | 제한 없음 |
-| 수정 없이 사용 | 제한 없음 |
-| 수정 후 서비스 제공 | 변경 사항 소스 공개 필요 |
-| SaaS 형태 제공 | 네트워크를 통한 서비스 제공 시 소스 공개 의무 |
+| Usage Scenario | Obligations |
+|----------------|-------------|
+| Internal use | No restrictions |
+| Use without modifications | No restrictions |
+| Service provision after modifications | Source disclosure of changes required |
+| SaaS provision | Source disclosure obligation when providing service over network |
 
 ### 16.2 OZ Contracts: MIT
 
-- 상업적 사용 가능
-- 수정 및 배포 자유
-- 소스 공개 의무 없음
+- Commercial use allowed
+- Free modification and distribution
+- No source disclosure obligation
 
 ---
 
-## 관련 문서 참조
+## Related Document References
 
-| 문서 | 설명 | 경로 |
-|------|------|------|
-| 제품 요구사항 | 비즈니스 요구사항, 마일스톤, 성공 지표 | `./product.md` |
-| 시스템 구조 | 아키텍처, 디렉토리 구조, 데이터 흐름 | `./structure.md` |
-| Task Master PRD | 태스크 관리용 PRD | `.taskmaster/docs/prd.txt` |
+| Document | Description | Path |
+|----------|-------------|------|
+| Product Requirements | Business requirements, milestones, success metrics | `./product.md` |
+| System Architecture | Architecture, directory structure, data flow | `./structure.md` |
+| Task Master PRD | PRD for task management | `.taskmaster/docs/prd.txt` |
 
 ---
 
 ## HISTORY
 
-| 버전 | 날짜 | 변경사항 |
-|------|------|----------|
-| 12.2 | 2025-12-15 | Section 5.5 Health Check API 확장 - Relayer Pool Status Aggregation NestJS 구현 예시 추가 (HealthService, checkRelayerPoolHealth, aggregateStatus), Detailed Health Response JSON 예시 추가 (degraded 상태 포함) |
-| 12.1 | 2025-12-15 | API 응답 형식 표준화 - Section 5.1-5.4 응답을 Section 5.8 표준 형식으로 통일 (success/data/timestamp 래퍼 적용), Section 5 시작부에 표준 응답 형식 안내 추가 |
-| 12.0 | 2025-12-15 | 문서 버전 동기화 - 전체 문서 구조 정리 완료, 중복 제거, 교차 참조 체계 수립 |
-| 11.7 | 2025-12-15 | 문서 역할 명확화 - 헤더에 문서 역할(HOW) 및 cross-references 추가 |
-| 11.6 | 2025-12-15 | Section 5 API 사양 확장 - 5.6 Error Response Format (표준 에러 응답, HTTP Status Code Mapping, 에러 예시), 5.7 Rate Limiting (Phase 2+ Reserved, 헤더 사양), 5.8 Request/Response Examples (Direct TX, Gasless TX, Status Query JSON 예시), 5.9 Pagination (Phase 2+ Reserved, Query Parameters, 페이징 응답 형식) 추가 |
-| 11.5 | 2025-12-15 | Section 13 Docker Compose YAML Anchors 구조 수정 - x-relayer-common을 services 블록 외부 최상위 레벨로 이동, healthcheck/networks 추가, 올바른 YAML Anchors 문법 적용 |
-| 11.4 | 2025-12-15 | Section 5.5 Health Check API 응답 스키마 수정 - Phase 1 서비스만 포함 (api-gateway, oz-relayer-pool, redis), Phase 2+ 확장 스키마 분리 (oz-monitor, mysql 추가), oz-relayer-pool 상태 집계 로직 설명 추가 |
-| 11.3 | 2025-12-15 | Section 11.3 OZ Relayer 설정 파일 경로 수정 - 중첩 디렉토리 구조를 flat 파일 구조로 변경 (prd.txt, Docker Compose와 일관성 확보), Docker 볼륨 마운트 참고 추가 |
-| 11.2 | 2025-12-15 | Docker Compose YAML Anchors 패턴 적용 - Multi-Relayer Pool 설정 중복 최소화, deploy.replicas 미사용 이유 설명 (개별 Private Key 필요) |
-| 11.1 | 2025-12-15 | Section 9.1 API Key 인증 추가 - Phase 1 단일 환경변수 방식 (API_GATEWAY_API_KEY), Phase 2+ 확장 계획 명시 |
-| 11.0 | 2025-12-15 | SPEC-INFRA-001 기준 Docker 구조 동기화 - docker/ 디렉토리로 통합, 멀티스테이지 빌드 (Dockerfile.packages), .env 제거, Hardhat Node 포함, Redis 8.0-alpine (AOF), Named Volume (msq-relayer-redis-data), OZ Relayer RPC_URL/REDIS_HOST/REDIS_PORT 환경변수, Read-only 볼륨 마운트 (:ro), Section 13 v5.0 |
-| 10.0 | 2025-12-15 | MySQL/Prisma를 Phase 2+로 이동 - Phase 1은 OZ Relayer + Redis만 사용, DB 없음, Docker Compose에서 mysql 제거 |
-| 9.0 | 2025-12-15 | TX History, Webhook Handler를 Phase 2+로 이동 - Phase 1은 상태 폴링 방식 사용, MySQL/Webhook은 Phase 2+에서 구현 |
-| 8.0 | 2025-12-15 | Rate Limiting, Quota Manager 완전 제거 - Phase 1은 Auth + Relay 기능만 유지 |
-| 7.0 | 2025-12-15 | Phase 2 재설계 - SDK 제거 (API 문서로 대체), Queue System 추가 (QUEUE_PROVIDER 패턴: Redis/BullMQ, AWS SQS) |
-| 6.2 | 2025-12-15 | Docker Build 전략 확정 - 패키지별 Dockerfile 방식 채택, Docker Compose build context/dockerfile 설정 명시 |
-| 6.1 | 2025-12-15 | Multi-Relayer Pool 설정 추가 - Section 11.3 (Pool 구성, Load Balancing, Scaling), Docker Compose v4.0 (Multi-Relayer Profile 지원) |
-| 6.0 | 2025-12-15 | Phase 1에 Gasless TX 포함 - Gasless API/SDK Phase 1으로 이동, EIP-712 검증 Phase 1, OZ Monitor/Policy/Quota는 Phase 2+ 유지 |
-| 5.0 | 2025-12-14 | Phase 1 중심으로 재정리 - 구현 범위 테이블 추가, OZ Monitor/Gasless/Policy를 Phase 2+로 표시 |
-| 4.0 | 2025-12-13 | B2B Infrastructure 관점으로 전면 재작성 - SDK 예제를 Client Service 백엔드 통합 패턴으로 변경, Gasless TX 흐름을 Server-to-Server로 수정 |
-| 3.0 | 2025-12-13 | OZ 오픈소스 (Relayer v1.3.0, Monitor v1.1.0) 기반 기술 스택으로 전면 재설계, BullMQ → Redis (OZ native), OZ 설정 가이드 추가 |
-| 2.3 | 2025-12-12 | 문서 일관성 개선, 관련 문서 참조 추가 |
-| 2.2 | 2025-12-12 | Examples Package 섹션 추가 |
-| 2.1 | 2025-12-12 | Client SDK를 OZ Defender SDK 호환 패턴으로 개편 |
-| 2.0 | 2025-12-12 | 초기 tech.md 생성 |
+| Version | Date | Changes |
+|---------|------|---------|
+| 12.2 | 2025-12-15 | Section 5.5 Health Check API expansion - Added Relayer Pool Status Aggregation NestJS implementation example (HealthService, checkRelayerPoolHealth, aggregateStatus), Added Detailed Health Response JSON example (including degraded status) |
+| 12.1 | 2025-12-15 | API response format standardization - Unified Section 5.1-5.4 responses to Section 5.8 standard format (success/data/timestamp wrapper applied), Added standard response format guide at Section 5 start |
+| 12.0 | 2025-12-15 | Document version sync - Complete document structure cleanup, duplicate removal, cross-reference system establishment |
+| 11.7 | 2025-12-15 | Document role clarification - Added document role (HOW) and cross-references to header |
+| 11.6 | 2025-12-15 | Section 5 API spec expansion - 5.6 Error Response Format (standard error response, HTTP Status Code Mapping, error examples), 5.7 Rate Limiting (Phase 2+ Reserved, header spec), 5.8 Request/Response Examples (Direct TX, Gasless TX, Status Query JSON examples), 5.9 Pagination (Phase 2+ Reserved, Query Parameters, paging response format) |
+| 11.5 | 2025-12-15 | Section 13 Docker Compose YAML Anchors structure fix - Moved x-relayer-common to top-level outside services block, added healthcheck/networks, applied correct YAML Anchors syntax |
+| 11.4 | 2025-12-15 | Section 5.5 Health Check API response schema fix - Phase 1 services only (api-gateway, oz-relayer-pool, redis), Phase 2+ extended schema separation (oz-monitor, mysql added), oz-relayer-pool status aggregation logic description added |
+| 11.3 | 2025-12-15 | Section 11.3 OZ Relayer config file path fix - Changed nested directory structure to flat file structure (prd.txt, Docker Compose consistency), added Docker volume mount note |
+| 11.2 | 2025-12-15 | Docker Compose YAML Anchors pattern applied - Multi-Relayer Pool config duplication minimized, deploy.replicas non-usage reason explained (individual Private Key required) |
+| 11.1 | 2025-12-15 | Section 9.1 API Key authentication added - Phase 1 single environment variable method (API_GATEWAY_API_KEY), Phase 2+ extension plan specified |
+| 11.0 | 2025-12-15 | SPEC-INFRA-001 Docker structure sync - Consolidated to docker/ directory, multi-stage build (Dockerfile.packages), .env removed, Hardhat Node included, Redis 8.0-alpine (AOF), Named Volume (msq-relayer-redis-data), OZ Relayer RPC_URL/REDIS_HOST/REDIS_PORT env vars, Read-only volume mount (:ro), Section 13 v5.0 |
+| 10.0 | 2025-12-15 | MySQL/Prisma moved to Phase 2+ - Phase 1 uses OZ Relayer + Redis only, no DB, mysql removed from Docker Compose |
+| 9.0 | 2025-12-15 | TX History, Webhook Handler moved to Phase 2+ - Phase 1 uses status polling method, MySQL/Webhook implemented in Phase 2+ |
+| 8.0 | 2025-12-15 | Rate Limiting, Quota Manager completely removed - Phase 1 keeps Auth + Relay features only |
+| 7.0 | 2025-12-15 | Phase 2 redesign - SDK removed (replaced with API documentation), Queue System added (QUEUE_PROVIDER pattern: Redis/BullMQ, AWS SQS) |
+| 6.2 | 2025-12-15 | Docker Build strategy finalized - Per-package Dockerfile approach adopted, Docker Compose build context/dockerfile config specified |
+| 6.1 | 2025-12-15 | Multi-Relayer Pool config added - Section 11.3 (Pool configuration, Load Balancing, Scaling), Docker Compose v4.0 (Multi-Relayer Profile support) |
+| 6.0 | 2025-12-15 | Gasless TX included in Phase 1 - Gasless API/SDK moved to Phase 1, EIP-712 verification Phase 1, OZ Monitor/Policy/Quota remains Phase 2+ |
+| 5.0 | 2025-12-14 | Reorganized around Phase 1 - Implementation scope table added, OZ Monitor/Gasless/Policy marked as Phase 2+ |
+| 4.0 | 2025-12-13 | Complete rewrite from B2B Infrastructure perspective - SDK examples changed to Client Service backend integration patterns, Gasless TX flow changed to Server-to-Server |
+| 3.0 | 2025-12-13 | Complete redesign based on OZ open-source (Relayer v1.3.0, Monitor v1.1.0), BullMQ → Redis (OZ native), OZ configuration guide added |
+| 2.3 | 2025-12-12 | Document consistency improvements, related document references added |
+| 2.2 | 2025-12-12 | Examples Package section added |
+| 2.1 | 2025-12-12 | Client SDK reorganized to OZ Defender SDK compatible pattern |
+| 2.0 | 2025-12-12 | Initial tech.md creation |
