@@ -1,0 +1,174 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+dev-debug.log
+
+# Dependency directories
+node_modules/
+
+# Environment variables
+.env
+
+# Editor directories and files
+.idea
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS specific
+.DS_Store
+
+*~
+.moai/scripts/__pycache__/
+out/
+.moai/indexes/
+*.pyo
+# Add to .gitignore if needed per project
+.claude/skills/*/secrets/
+.LSOverride
+*_secret=*
+.idea/
+.venv/
+# Backups
+!.moai/config/**
+# OS Files
+.github/workflows/*.yml.bak
+.VolumeIcon.icns
+*.sqlite3
+env/
+# Build Artifacts
+!.moai/specs/
+.moai/work/
+!.moai/memory/**
+ehthumbs.db
+!.moai/scripts/
+.tscache/
+*.swo
+.moai/error_logs/
+*.dbm
+# Purpose: Essential patterns for user projects
+*.rdb
+.uv_cache/
+# Node.js (for docs/Nextra)
+.vscode/
+.DocumentRevisions-V100
+*.backup
+*.pfx
+.moai/analytics/
+coverage.json
+.moai/temp/
+# Windows
+*.egg-info/
+dist/
+.next/
+.claude/local/
+.gitlab-ci.yml.bak
+.moai/scripts/phase*.py
+.aws/credentials
+.cursor/
+.claude/skills/*/*/*secret*
+.coverage
+!.moai/specs/**
+*.pem
+.fseventsd
+# .moai local-only directories (user projects only)
+.netlify/
+# uv.lock
+*.egg
+# Python Cache & Database
+*.pyc
+.#*
+Thumbs.db
+# uv.lock is intentionally included for reproducible builds
+*-backup/
+.moai/reports/
+*.tmp
+logs/
+.env/
+!.moai/scripts/**
+# Claude Code Local Configuration
+.moai/logs/
+.uv-cache/
+!.env.example
+.mypy_cache/
+# ---------------------------------------------
+*.swp
+*.sublime-project
+.firebase/
+# .moai local development scripts (not distributed)
+# MoAI Directory Management
+# Environment Variables & Secrets
+# ============================================
+# Claude Code Skills Secrets
+.moai-backups/
+# Tracked in git: config/, memory/, scripts/, specs/
+# Linux
+.ruff_cache/
+.moai/learning/
+*.jks
+.aws/config
+.claude/.env.local*
+*.key
+# User-generated content: logs/, cache/, reports/, etc.
+.AppleDouble
+.env.*
+.moai/backups/
+# Mac
+.moai/scripts/sync-*.py
+*.tsbuildinfo
+!.moai/config/
+*.db
+# Logs & Temporary Files
+# MoAI-ADK Package Distribution .gitignore
+*.p12
+[Dd]esktop.ini
+.moai/scripts/*sync*.sh
+*.backup/
+*key*
+*_backup_*/
+.claude/skills/*/*/*token*
+!.moai/memory/
+.moai/docs/
+.TemporaryItems
+.Trashes
+# Package Distribution
+*secret*
+*.bak
+*_token=*
+.moai/*
+.pytest_cache/
+.claude/skills/*/.env*
+.claude/settings.local.*.json
+__pycache__/
+.claude/skills/*/*/*key*
+.moai/cache/
+build/
+venv/
+.moai/archived-skills/
+.moai/scripts/phase*.sh
+*.sublime-workspace
+# Virtual Environments
+*.pyd
+.moai/scripts/sync-*.sh
+# Version: 0.28.0
+.directory
+*.sqlite
+.Spotlight-V100
+# Test Coverage
+*.temp
+.vercel/
+.moai/archive/
+# CI/CD
+# IDE & Editors
+htmlcov/
+.claude/settings.local.json
+
+# Task files
+# tasks.json
+# tasks/ 
