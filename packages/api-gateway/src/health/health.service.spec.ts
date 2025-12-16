@@ -1,9 +1,9 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { HttpModule, HttpService } from '@nestjs/axios';
-import { of, throwError } from 'rxjs';
-import { HealthService } from './health.service';
+import { Test, TestingModule } from "@nestjs/testing";
+import { HttpModule, HttpService } from "@nestjs/axios";
+import { of, throwError } from "rxjs";
+import { HealthService } from "./health.service";
 
-describe('HealthService', () => {
+describe("HealthService", () => {
   let service: HealthService;
   let httpService: HttpService;
 
@@ -17,83 +17,81 @@ describe('HealthService', () => {
     httpService = module.get<HttpService>(HttpService);
   });
 
-  describe('checkRelayerPoolHealth', () => {
-    it('should return healthy status when all relayers are healthy', async () => {
+  describe("checkRelayerPoolHealth", () => {
+    it("should return healthy status when all relayers are healthy", async () => {
       // Mock all relayers as healthy
-      jest.spyOn(httpService, 'get').mockReturnValue(
+      jest.spyOn(httpService, "get").mockReturnValue(
         of({
-          data: { status: 'healthy' },
+          data: { status: "healthy" },
           status: 200,
-          statusText: 'OK',
+          statusText: "OK",
           headers: {},
-          config: { url: '' },
+          config: { url: "" },
         } as any),
       );
 
       const result = await service.checkRelayerPoolHealth();
 
-      expect(result.status).toBe('healthy');
+      expect(result.status).toBe("healthy");
       expect(result.healthyCount).toBe(3);
       expect(result.totalCount).toBe(3);
       expect(result.relayers).toHaveLength(3);
-      expect(result.relayers.every((r) => r.status === 'healthy')).toBe(true);
+      expect(result.relayers.every((r) => r.status === "healthy")).toBe(true);
     });
 
-    it('should return degraded status when some relayers are unhealthy', async () => {
+    it("should return degraded status when some relayers are unhealthy", async () => {
       // Mock: 1st call healthy, 2nd call healthy, 3rd call unhealthy
-      const mockGet = jest.spyOn(httpService, 'get');
+      const mockGet = jest.spyOn(httpService, "get");
       mockGet
         .mockReturnValueOnce(
           of({
-            data: { status: 'healthy' },
+            data: { status: "healthy" },
             status: 200,
-            statusText: 'OK',
+            statusText: "OK",
             headers: {},
-            config: { url: '' },
+            config: { url: "" },
           } as any),
         )
         .mockReturnValueOnce(
           of({
-            data: { status: 'healthy' },
+            data: { status: "healthy" },
             status: 200,
-            statusText: 'OK',
+            statusText: "OK",
             headers: {},
-            config: { url: '' },
+            config: { url: "" },
           } as any),
         )
-        .mockReturnValueOnce(throwError(() => new Error('Connection refused')));
+        .mockReturnValueOnce(throwError(() => new Error("Connection refused")));
 
       const result = await service.checkRelayerPoolHealth();
 
-      expect(result.status).toBe('degraded');
+      expect(result.status).toBe("degraded");
       expect(result.healthyCount).toBe(2);
       expect(result.totalCount).toBe(3);
     });
 
-    it('should return unhealthy status when all relayers are unhealthy', async () => {
+    it("should return unhealthy status when all relayers are unhealthy", async () => {
       // Mock all relayers as unhealthy
       jest
-        .spyOn(httpService, 'get')
-        .mockReturnValue(
-          throwError(() => new Error('Connection timeout')),
-        );
+        .spyOn(httpService, "get")
+        .mockReturnValue(throwError(() => new Error("Connection timeout")));
 
       const result = await service.checkRelayerPoolHealth();
 
-      expect(result.status).toBe('unhealthy');
+      expect(result.status).toBe("unhealthy");
       expect(result.healthyCount).toBe(0);
       expect(result.totalCount).toBe(3);
-      expect(result.relayers.every((r) => r.status === 'unhealthy')).toBe(true);
+      expect(result.relayers.every((r) => r.status === "unhealthy")).toBe(true);
     });
 
-    it('should include response time in relayer health check', async () => {
-      jest.spyOn(httpService, 'get').mockReturnValue(
+    it("should include response time in relayer health check", async () => {
+      jest.spyOn(httpService, "get").mockReturnValue(
         of({
-          data: { status: 'healthy' },
+          data: { status: "healthy" },
           status: 200,
-          statusText: 'OK',
+          statusText: "OK",
           headers: {},
-          config: { url: '' },
+          config: { url: "" },
         } as any),
       );
 
@@ -103,26 +101,26 @@ describe('HealthService', () => {
       expect(result.relayers[0].responseTime).toBeGreaterThanOrEqual(0);
     });
 
-    it('should include error information when relayer is unhealthy', async () => {
-      const errorMessage = 'Connection refused';
+    it("should include error information when relayer is unhealthy", async () => {
+      const errorMessage = "Connection refused";
       jest
-        .spyOn(httpService, 'get')
+        .spyOn(httpService, "get")
         .mockReturnValueOnce(
           of({
-            data: { status: 'healthy' },
+            data: { status: "healthy" },
             status: 200,
-            statusText: 'OK',
+            statusText: "OK",
             headers: {},
-            config: { url: '' },
+            config: { url: "" },
           } as any),
         )
         .mockReturnValueOnce(
           of({
-            data: { status: 'healthy' },
+            data: { status: "healthy" },
             status: 200,
-            statusText: 'OK',
+            statusText: "OK",
             headers: {},
-            config: { url: '' },
+            config: { url: "" },
           } as any),
         )
         .mockReturnValueOnce(throwError(() => new Error(errorMessage)));
@@ -133,55 +131,55 @@ describe('HealthService', () => {
     });
   });
 
-  describe('getSystemHealth', () => {
-    it('should return overall healthy status', async () => {
-      jest.spyOn(httpService, 'get').mockReturnValue(
+  describe("getSystemHealth", () => {
+    it("should return overall healthy status", async () => {
+      jest.spyOn(httpService, "get").mockReturnValue(
         of({
-          data: { status: 'healthy' },
+          data: { status: "healthy" },
           status: 200,
-          statusText: 'OK',
+          statusText: "OK",
           headers: {},
-          config: { url: '' },
+          config: { url: "" },
         } as any),
       );
 
       const result = await service.getSystemHealth();
 
-      expect(result.status).toBe('healthy');
-      expect(result.services['api-gateway']).toBe('healthy');
-      expect(result.services.redis).toBe('healthy');
+      expect(result.status).toBe("healthy");
+      expect(result.services["api-gateway"]).toBe("healthy");
+      expect(result.services.redis).toBe("healthy");
       expect(result.timestamp).toBeDefined();
     });
 
-    it('should include all required fields in response', async () => {
-      jest.spyOn(httpService, 'get').mockReturnValue(
+    it("should include all required fields in response", async () => {
+      jest.spyOn(httpService, "get").mockReturnValue(
         of({
-          data: { status: 'healthy' },
+          data: { status: "healthy" },
           status: 200,
-          statusText: 'OK',
+          statusText: "OK",
           headers: {},
-          config: { url: '' },
+          config: { url: "" },
         } as any),
       );
 
       const result = await service.getSystemHealth();
 
-      expect(result).toHaveProperty('status');
-      expect(result).toHaveProperty('timestamp');
-      expect(result).toHaveProperty('services');
-      expect(result.services).toHaveProperty('api-gateway');
-      expect(result.services).toHaveProperty('oz-relayer-pool');
-      expect(result.services).toHaveProperty('redis');
+      expect(result).toHaveProperty("status");
+      expect(result).toHaveProperty("timestamp");
+      expect(result).toHaveProperty("services");
+      expect(result.services).toHaveProperty("api-gateway");
+      expect(result.services).toHaveProperty("oz-relayer-pool");
+      expect(result.services).toHaveProperty("redis");
     });
 
-    it('should set timestamp to ISO format', async () => {
-      jest.spyOn(httpService, 'get').mockReturnValue(
+    it("should set timestamp to ISO format", async () => {
+      jest.spyOn(httpService, "get").mockReturnValue(
         of({
-          data: { status: 'healthy' },
+          data: { status: "healthy" },
           status: 200,
-          statusText: 'OK',
+          statusText: "OK",
           headers: {},
-          config: { url: '' },
+          config: { url: "" },
         } as any),
       );
 
@@ -193,11 +191,11 @@ describe('HealthService', () => {
     });
   });
 
-  describe('checkRedisHealth', () => {
-    it('should return healthy for Redis', async () => {
+  describe("checkRedisHealth", () => {
+    it("should return healthy for Redis", async () => {
       const result = await service.checkRedisHealth();
 
-      expect(result).toBe('healthy');
+      expect(result).toBe("healthy");
     });
   });
 });
