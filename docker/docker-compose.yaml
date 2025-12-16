@@ -1,0 +1,152 @@
+# === YAML Anchors Definition (Top-level, outside services block) ===
+# Note: Each Relayer needs unique Private Key to prevent Nonce collision
+# YAML Anchors reuse common configuration to minimize duplication
+
+x-relayer-common: &relayer-common
+  image: openzeppelin/openzeppelin-relayer:latest
+  depends_on:
+    redis:
+      condition: service_healthy
+    hardhat-node:
+      condition: service_healthy
+  restart: unless-stopped
+  networks:
+    - msq-relayer-network
+  healthcheck:
+    test: ["CMD-SHELL", "cat /proc/net/tcp | grep ':1F90' || exit 1"]
+    interval: 10s
+    timeout: 5s
+    retries: 3
+    start_period: 30s
+
+x-relayer-env: &relayer-env
+  RUST_LOG: info
+  API_GATEWAY_API_KEY: local-dev-api-key
+  KEYSTORE_PASSPHRASE: hardhat-test-passphrase
+  WEBHOOK_SIGNING_KEY: local-dev-webhook-signing-key-32ch
+  RPC_URL: http://hardhat-node:8545
+  REDIS_URL: redis://redis:6379
+
+# === Services Block (after anchors definition) ===
+services:
+  # === Local Blockchain (Phase 1 Required) ===
+  hardhat-node:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.packages
+      target: hardhat-node
+    ports:
+      - "8545:8545"
+    environment:
+      CHAIN_ID: 31337
+      NETWORK_ID: 31337
+      ACCOUNTS_TO_CREATE: 20
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8545"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - msq-relayer-network
+    restart: unless-stopped
+
+  # === Redis Cache & Queue ===
+  redis:
+    image: redis/redis-stack:latest
+    ports:
+      - "6379:6379"
+      - "8001:8001"
+    environment:
+      REDIS_ARGS: "--appendonly yes"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    volumes:
+      - msq-relayer-redis-data:/data
+    networks:
+      - msq-relayer-network
+    restart: unless-stopped
+
+  # === API Gateway (NestJS) ===
+  api-gateway:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.packages
+      target: api-gateway
+    command: ["pnpm", "run", "start"]
+    ports:
+      - "3000:3000"
+    depends_on:
+      hardhat-node:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      REDIS_URL: redis://redis:6379
+      RPC_URL: http://hardhat-node:8545
+      API_GATEWAY_API_KEY: local-dev-api-key
+    networks:
+      - msq-relayer-network
+    restart: unless-stopped
+
+  # === OZ Relayer Pool (3 Instances) ===
+  # Each Relayer holds independent Private Key (Hardhat Accounts #10, #11, #12)
+  oz-relayer-1:
+    <<: *relayer-common
+    container_name: oz-relayer-1
+    ports:
+      - "8081:8080"
+      - "8091:8081"
+    volumes:
+      - ./config/oz-relayer/relayer-1.json:/app/config/config.json:ro
+      - ./keys/relayer-1:/app/config/keys:ro
+    environment:
+      <<: *relayer-env
+      API_KEY: test-api-key-relayer-1-local-dev-32ch
+
+  oz-relayer-2:
+    <<: *relayer-common
+    container_name: oz-relayer-2
+    ports:
+      - "8082:8080"
+      - "8092:8081"
+    volumes:
+      - ./config/oz-relayer/relayer-2.json:/app/config/config.json:ro
+      - ./keys/relayer-2:/app/config/keys:ro
+    environment:
+      <<: *relayer-env
+      API_KEY: test-api-key-relayer-2-local-dev-32ch
+
+  oz-relayer-3:
+    <<: *relayer-common
+    container_name: oz-relayer-3
+    ports:
+      - "8083:8080"
+      - "8093:8081"
+    volumes:
+      - ./config/oz-relayer/relayer-3.json:/app/config/config.json:ro
+      - ./keys/relayer-3:/app/config/keys:ro
+    environment:
+      <<: *relayer-env
+      API_KEY: test-api-key-relayer-3-local-dev-32ch
+
+  # === Phase 2+: Services (commented, enabled via profiles) ===
+  # oz-monitor:
+  #   image: openzeppelin/openzeppelin-monitor:latest
+  #   profiles: ["monitoring"]
+  #   volumes:
+  #     - ./config/oz-monitor:/app/config
+  #   networks:
+  #     - msq-relayer-network
+
+networks:
+  msq-relayer-network:
+    driver: bridge
+
+volumes:
+  msq-relayer-redis-data:
+    driver: local

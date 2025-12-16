@@ -182,3 +182,16 @@ htmlcov/
 
 # Serena MCP cache
 .serena/cache/
+
+# Private Keys (CRITICAL - SPEC-INFRA-001)
+docker/keys/
+
+# Sample keys included in Git (for development)
+!docker/keys-example/
+
+# Hardhat (packages/contracts)
+packages/contracts/artifacts/
+packages/contracts/cache/
+packages/contracts/typechain-types/
+packages/contracts/coverage/
+packages/contracts/.env

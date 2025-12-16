@@ -580,6 +580,18 @@ Alfred and all agents MUST follow these rules when creating Git commits:
    - No "Co-authored-by: Claude" or similar tags
    - No mentions of AI assistance in commit body
 
+**Commit Automation Policy**:
+
+1. **Manual Commits Only**: NEVER create commits automatically
+   - All commits MUST be initiated by explicit user request
+   - After implementation, report changes and ASK user if they want to commit
+   - Do NOT auto-commit even after successful implementation
+
+2. **Commit Request Pattern**:
+   - After completing implementation, show summary of changed files
+   - Ask user: "Do you want to commit these changes?"
+   - Only proceed with commit if user explicitly approves
+
 **Example**:
 
 ```bash
@@ -654,6 +666,44 @@ Docker Compose infrastructure setup. See [tech.md](./tech.md#docker-compose) for
 ## tech.md
 ### Docker Compose
 [single source of detailed explanation]
+```
+
+---
+
+## Rule 13: Package Manager
+
+This project uses **pnpm** as the package manager. All agents MUST follow these rules:
+
+**Required Package Manager**:
+
+1. **pnpm Only**: Always use `pnpm` instead of `npm` or `yarn`
+   - `pnpm install` instead of `npm install`
+   - `pnpm add` instead of `npm install <package>`
+   - `pnpm run` instead of `npm run`
+
+2. **Dockerfile Updates**: Use pnpm in Dockerfiles
+   - `RUN corepack enable && corepack prepare pnpm@latest --activate`
+   - `RUN pnpm install --frozen-lockfile`
+
+3. **Lock File**: Project uses `pnpm-lock.yaml` (not package-lock.json)
+
+**Example Commands**:
+
+```bash
+# Install all dependencies
+pnpm install
+
+# Add a dependency
+pnpm add express
+
+# Add a dev dependency
+pnpm add -D typescript
+
+# Run a script
+pnpm run build
+
+# Run workspace script
+pnpm --filter @msq-relayer/api-gateway run dev
 ```
 
 ---
