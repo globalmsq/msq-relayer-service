@@ -1,0 +1,59 @@
+{
+  "relayers": [
+    {
+      "id": "relayer-3",
+      "name": "MSQ Relayer 3 (Hardhat Account #12)",
+      "network": "hardhat",
+      "network_type": "evm",
+      "signer_id": "relayer-3-signer",
+      "notification_id": "relayer-3-webhook",
+      "paused": false,
+      "custom_rpc_urls": [
+        {
+          "url": "http://hardhat-node:8545",
+          "weight": 100
+        }
+      ],
+      "policies": {
+        "gas_price_cap": 500000000000,
+        "min_balance": 100000000000000000
+      }
+    }
+  ],
+  "signers": [
+    {
+      "id": "relayer-3-signer",
+      "type": "local",
+      "config": {
+        "path": "/app/config/keys/keystore.json",
+        "passphrase": {
+          "type": "env",
+          "value": "KEYSTORE_PASSPHRASE"
+        }
+      }
+    }
+  ],
+  "notifications": [
+    {
+      "id": "relayer-3-webhook",
+      "type": "webhook",
+      "url": "http://api-gateway:3000/api/v1/webhook/relayer",
+      "signing_key": {
+        "type": "env",
+        "value": "WEBHOOK_SIGNING_KEY"
+      }
+    }
+  ],
+  "networks": [
+    {
+      "type": "evm",
+      "network": "hardhat",
+      "chain_id": 31337,
+      "required_confirmations": 1,
+      "rpc_urls": ["http://hardhat-node:8545"],
+      "symbol": "ETH",
+      "is_testnet": true,
+      "average_blocktime_ms": 2000
+    }
+  ]
+}

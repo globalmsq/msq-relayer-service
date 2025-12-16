@@ -1,0 +1,116 @@
+version: '3.8'
+
+# === Polygon Amoy Testnet Configuration ===
+# Same infrastructure as docker-compose.yaml but with Amoy RPC endpoints
+# No Hardhat Node (uses Polygon Amoy RPC)
+
+x-relayer-common: &relayer-common
+  image: openzeppelin/openzeppelin-relayer:latest
+  depends_on:
+    redis:
+      condition: service_healthy
+  restart: unless-stopped
+  networks:
+    - msq-relayer-network
+  healthcheck:
+    test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/health"]
+    interval: 10s
+    timeout: 5s
+    retries: 3
+    start_period: 30s
+
+x-relayer-env: &relayer-env
+  RUST_LOG: info
+  API_GATEWAY_API_KEY: amoy-dev-api-key
+  KEYSTORE_PASSPHRASE: amoy-test-passphrase
+  RPC_URL: https://rpc-amoy.polygon.technology
+  REDIS_URL: redis://redis:6379
+
+services:
+  # === Redis Cache & Queue (same as local) ===
+  redis:
+    image: redis/redis-stack:latest
+    ports:
+      - "6379:6379"
+      - "8001:8001"
+    environment:
+      REDIS_ARGS: "--appendonly yes"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    volumes:
+      - msq-relayer-redis-data-amoy:/data
+    networks:
+      - msq-relayer-network
+    restart: unless-stopped
+
+  # === API Gateway (NestJS) ===
+  api-gateway:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.packages
+      target: api-gateway
+    ports:
+      - "3000:3000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: staging
+      REDIS_URL: redis://redis:6379
+      RPC_URL: https://rpc-amoy.polygon.technology
+      API_GATEWAY_API_KEY: amoy-dev-api-key
+      NETWORK: amoy
+    networks:
+      - msq-relayer-network
+    restart: unless-stopped
+
+  # === OZ Relayer Pool for Amoy ===
+  oz-relayer-1:
+    <<: *relayer-common
+    container_name: oz-relayer-amoy-1
+    ports:
+      - "8081:8080"
+      - "8091:8081"
+    volumes:
+      - ./config/oz-relayer/relayer-1.json:/app/config/config.json:ro
+      - ./keys/relayer-1:/app/config/keys:ro
+    environment:
+      <<: *relayer-env
+      API_KEY: test-api-key-relayer-amoy-1-staging-32ch
+
+  oz-relayer-2:
+    <<: *relayer-common
+    container_name: oz-relayer-amoy-2
+    ports:
+      - "8082:8080"
+      - "8092:8081"
+    volumes:
+      - ./config/oz-relayer/relayer-2.json:/app/config/config.json:ro
+      - ./keys/relayer-2:/app/config/keys:ro
+    environment:
+      <<: *relayer-env
+      API_KEY: test-api-key-relayer-amoy-2-staging-32ch
+
+  oz-relayer-3:
+    <<: *relayer-common
+    container_name: oz-relayer-amoy-3
+    ports:
+      - "8083:8080"
+      - "8093:8081"
+    volumes:
+      - ./config/oz-relayer/relayer-3.json:/app/config/config.json:ro
+      - ./keys/relayer-3:/app/config/keys:ro
+    environment:
+      <<: *relayer-env
+      API_KEY: test-api-key-relayer-amoy-3-staging-32ch
+
+networks:
+  msq-relayer-network:
+    driver: bridge
+
+volumes:
+  msq-relayer-redis-data-amoy:
+    driver: local

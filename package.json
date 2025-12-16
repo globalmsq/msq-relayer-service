@@ -1,0 +1,24 @@
+{
+  "name": "msq-relayer-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MSQ Relayer Service - Meta Transaction Relay Infrastructure",
+  "packageManager": "pnpm@9.15.1",
+  "scripts": {
+    "dev": "pnpm --filter @msq-relayer/api-gateway run dev",
+    "build": "pnpm -r run build",
+    "test": "pnpm -r run test",
+    "lint": "pnpm -r run lint",
+    "docker:up": "cd docker && docker compose up -d",
+    "docker:down": "cd docker && docker compose down",
+    "docker:build": "cd docker && docker compose up --build"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/msq-relayer-service.git"
+  },
+  "license": "MIT"
+}
