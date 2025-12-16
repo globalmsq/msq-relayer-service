@@ -1,187 +1,192 @@
-# Logs
-logs
+# ============================================
+# MSQ Relayer Service .gitignore
+# Version: 1.0.0
+# ============================================
+
+# ===========================================
+# OS Files
+# ===========================================
+
+# Mac
+.DS_Store
+.AppleDouble
+.LSOverride
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+
+# Windows
+Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
+
+# Linux
+.directory
+*~
+.#*
+
+# ===========================================
+# IDE & Editors
+# ===========================================
+
+# JetBrains (IntelliJ, WebStorm, etc.)
+.idea/
+
+# VS Code
+.vscode/
+
+# Cursor IDE
+.cursor/
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim/Neovim
+*.swp
+*.swo
+*.sw?
+
+# Visual Studio
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# ===========================================
+# Logs & Temporary Files
+# ===========================================
+
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 dev-debug.log
 
-# Dependency directories
-node_modules/
-
-# Environment variables
-.env
-
-# Editor directories and files
-.idea
-.vscode
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-
-# OS specific
-.DS_Store
-
-*~
-.moai/scripts/__pycache__/
-out/
-.moai/indexes/
-*.pyo
-# Add to .gitignore if needed per project
-.claude/skills/*/secrets/
-.LSOverride
-*_secret=*
-.idea/
-.venv/
-# Backups
-!.moai/config/**
-# OS Files
-.github/workflows/*.yml.bak
-.VolumeIcon.icns
-*.sqlite3
-env/
-# Build Artifacts
-!.moai/specs/
-.moai/work/
-!.moai/memory/**
-ehthumbs.db
-!.moai/scripts/
-.tscache/
-*.swo
-.moai/error_logs/
-*.dbm
-# Purpose: Essential patterns for user projects
-*.rdb
-.uv_cache/
-# Node.js (for docs/Nextra)
-.vscode/
-.DocumentRevisions-V100
-*.backup
-*.pfx
-.moai/analytics/
-coverage.json
-.moai/temp/
-# Windows
-*.egg-info/
-dist/
-.next/
-.claude/local/
-.gitlab-ci.yml.bak
-.moai/scripts/phase*.py
-.aws/credentials
-.cursor/
-.claude/skills/*/*/*secret*
-.coverage
-!.moai/specs/**
-*.pem
-.fseventsd
-# .moai local-only directories (user projects only)
-.netlify/
-# uv.lock
-*.egg
-# Python Cache & Database
-*.pyc
-.#*
-Thumbs.db
-# uv.lock is intentionally included for reproducible builds
-*-backup/
-.moai/reports/
 *.tmp
-logs/
-.env/
-!.moai/scripts/**
-# Claude Code Local Configuration
-.moai/logs/
-.uv-cache/
-!.env.example
-.mypy_cache/
-# ---------------------------------------------
-*.swp
-*.sublime-project
-.firebase/
-# .moai local development scripts (not distributed)
-# MoAI Directory Management
-# Environment Variables & Secrets
-# ============================================
-# Claude Code Skills Secrets
-.moai-backups/
-# Tracked in git: config/, memory/, scripts/, specs/
-# Linux
-.ruff_cache/
-.moai/learning/
-*.jks
-.aws/config
-.claude/.env.local*
-*.key
-# User-generated content: logs/, cache/, reports/, etc.
-.AppleDouble
-.env.*
-.moai/backups/
-# Mac
-.moai/scripts/sync-*.py
-*.tsbuildinfo
-!.moai/config/
-*.db
-# Logs & Temporary Files
-# MoAI-ADK Package Distribution .gitignore
-*.p12
-[Dd]esktop.ini
-.moai/scripts/*sync*.sh
-*.backup/
-*key*
-*_backup_*/
-.claude/skills/*/*/*token*
-!.moai/memory/
-.moai/docs/
-.TemporaryItems
-.Trashes
-# Package Distribution
-*secret*
-*.bak
-*_token=*
-.moai/*
-.pytest_cache/
-.claude/skills/*/.env*
-.claude/settings.local.*.json
-__pycache__/
-.claude/skills/*/*/*key*
-.moai/cache/
-build/
-venv/
-.moai/archived-skills/
-.moai/scripts/phase*.sh
-*.sublime-workspace
-# Virtual Environments
-*.pyd
-.moai/scripts/sync-*.sh
-# Version: 0.28.0
-.directory
-*.sqlite
-.Spotlight-V100
-# Test Coverage
 *.temp
-.vercel/
-.moai/archive/
-# CI/CD
-# IDE & Editors
+*.backup
+*.bak
+*-backup/
+*.backup/
+*_backup_*/
+
+# ===========================================
+# Node.js & Dependencies
+# ===========================================
+
+node_modules/
+.next/
+dist/
+out/
+build/
+*.tsbuildinfo
+.tscache/
+
+# ===========================================
+# Python Environment
+# ===========================================
+
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg
+*.egg-info/
+venv/
+.venv/
+env/
+.env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
 htmlcov/
+coverage.json
+
+# ===========================================
+# Build Artifacts & Cache
+# ===========================================
+
+*.db
+*.sqlite
+*.sqlite3
+*.dbm
+*.rdb
+
+# Firebase & Vercel
+.firebase/
+.vercel/
+.netlify/
+
+# UV Cache
+.uv_cache/
+.uv-cache/
+
+# ===========================================
+# Environment Variables & Secrets
+# ===========================================
+
+.env
+.env.*
+!.env.example
+
+# AWS
+.aws/credentials
+.aws/config
+
+# Keys & Certificates
+*.pem
+*.key
+*.pfx
+*.p12
+*.jks
+*key*
+*secret*
+*_secret=*
+*_token=*
+
+# ===========================================
+# MoAI Directory Management
+# ===========================================
+
+# Ignore all .moai subdirectories first
+.moai/*
+
+# Then whitelist tracked directories (ORDER MATTERS!)
+!.moai/config/
+!.moai/config/**
+!.moai/scripts/
+!.moai/scripts/**
+!.moai/specs/
+!.moai/specs/**
+
+# MoAI local-only (never tracked)
+.moai-backups/
+
+# ===========================================
+# Claude Code Configuration
+# ===========================================
+
+.claude/local/
 .claude/settings.local.json
+.claude/settings.local.*.json
+.claude/.env.local*
 
-# Task files
-# tasks.json
-# tasks/
+# Claude Code Skills Secrets
+.claude/skills/*/secrets/
+.claude/skills/*/.env*
+.claude/skills/*/*/*secret*
+.claude/skills/*/*/*key*
+.claude/skills/*/*/*token*
 
-# Cursor IDE
-.cursor/
-
-# Taskmaster local state
-.taskmaster/state.json
-.taskmaster/reports/
-
-# Serena MCP cache
-.serena/cache/
+# ===========================================
+# Project-Specific: Docker
+# ===========================================
 
 # Private Keys (CRITICAL - SPEC-INFRA-001)
 docker/keys/
@@ -189,9 +194,32 @@ docker/keys/
 # Sample keys included in Git (for development)
 !docker/keys-example/
 
-# Hardhat (packages/contracts)
+# ===========================================
+# Project-Specific: Hardhat (packages/contracts)
+# ===========================================
+
 packages/contracts/artifacts/
 packages/contracts/cache/
 packages/contracts/typechain-types/
 packages/contracts/coverage/
 packages/contracts/.env
+
+# ===========================================
+# Project-Specific: TaskMaster
+# ===========================================
+
+.taskmaster/state.json
+.taskmaster/reports/
+
+# ===========================================
+# Project-Specific: Serena MCP
+# ===========================================
+
+.serena/cache/
+
+# ===========================================
+# CI/CD Backups
+# ===========================================
+
+.github/workflows/*.yml.bak
+.gitlab-ci.yml.bak
