@@ -318,13 +318,26 @@ msq-relayer-service/
 │   │   │
 │   │   └── package.json             # (No Dockerfile - uses docker/Dockerfile.packages)
 │   │
-│   ├── contracts/                   # Smart Contracts (using OZ)
+│   ├── contracts/                   # Smart Contracts (using OZ) - SPEC-CONTRACTS-001
 │   │   ├── contracts/
-│   │   │   └── tokens/
+│   │   │   ├── forwarder/           # ERC2771Forwarder (OZ standard)
+│   │   │   └── samples/
 │   │   │       ├── SampleToken.sol  # ERC20 + ERC2771Context
 │   │   │       └── SampleNFT.sol    # ERC721 + ERC2771Context
 │   │   ├── scripts/
-│   │   │   └── deploy-forwarder.ts
+│   │   │   ├── deploy-forwarder.ts
+│   │   │   └── deploy-samples.ts
+│   │   ├── test/
+│   │   │   ├── forwarder.test.ts
+│   │   │   ├── sample-token.test.ts
+│   │   │   └── sample-nft.test.ts
+│   │   ├── deployments/
+│   │   │   ├── localhost/
+│   │   │   │   ├── forwarder.json
+│   │   │   │   ├── sample-token.json
+│   │   │   │   └── sample-nft.json
+│   │   │   └── amoy/
+│   │   │       └── forwarder.json
 │   │   ├── hardhat.config.ts
 │   │   └── package.json
 │   │
@@ -440,17 +453,83 @@ relay-api:
 
 ### 4.4 packages/contracts
 
-**Smart Contracts** - OpenZeppelin-based smart contracts
+**Smart Contracts** - Hardhat project with OpenZeppelin-based contracts (SPEC-CONTRACTS-001)
 
-| File | Responsibility |
-|------|---------------|
-| `SampleToken.sol` | ERC20 + ERC2771Context (Gasless support example) |
-| `SampleNFT.sol` | ERC721 + ERC2771Context (Gasless support example) |
-| `deploy-forwarder.ts` | OZ ERC2771Forwarder deployment script |
+#### Project Structure
+
+| Directory | Responsibility | Status |
+|-----------|---|---|
+| `contracts/forwarder/` | Uses @openzeppelin/contracts/metatx/ERC2771Forwarder.sol directly | ✅ Deployed |
+| `contracts/samples/` | SampleToken (ERC20), SampleNFT (ERC721) with ERC2771Context | ✅ Implemented |
+| `scripts/` | Deployment scripts for Forwarder and Sample contracts | ✅ Ready |
+| `test/` | Unit tests for contracts (signature verification, context integration) | ✅ Complete |
+| `deployments/` | Deployment artifacts and addresses (localhost, amoy) | ✅ Created |
+
+#### File Responsibilities
+
+| File | Responsibility | Notes |
+|------|---|---|
+| `SampleToken.sol` | ERC20 + ERC2771Context | Gasless token transfer example |
+| `SampleNFT.sol` | ERC721 + ERC2771Context | Gasless NFT minting example |
+| `deploy-forwarder.ts` | ERC2771Forwarder deployment | Network detection (localhost, amoy) |
+| `deploy-samples.ts` | Sample contracts deployment | Localhost only (Chain ID: 31337) |
+| `forwarder.test.ts` | ERC2771Forwarder unit tests | EIP-712 verification, nonce management |
+| `sample-token.test.ts` | SampleToken integration tests | Gasless transfer, context verification |
+| `sample-nft.test.ts` | SampleNFT integration tests | Gasless minting, context verification |
+
+#### Deployment Artifacts
+
+**File Locations**:
+- `deployments/localhost/forwarder.json` - Forwarder deployment on Hardhat Node
+- `deployments/localhost/sample-token.json` - SampleToken deployment on Hardhat Node
+- `deployments/localhost/sample-nft.json` - SampleNFT deployment on Hardhat Node
+- `deployments/amoy/forwarder.json` - Forwarder deployment on Polygon Amoy
+
+**Artifact Contents** (Example):
+```json
+{
+  "address": "0x...",
+  "deployer": "0x...",
+  "network": "localhost",
+  "chainId": 31337,
+  "transactionHash": "0x...",
+  "blockNumber": 1,
+  "timestamp": "2025-12-18T00:00:00Z",
+  "name": "Relayer-Forwarder-localhost",
+  "version": "1",
+  "abi": [...]
+}
+```
+
+#### Deployment Commands
+
+```bash
+# Deploy to Hardhat Node (localhost)
+npx hardhat run scripts/deploy-forwarder.ts --network localhost
+npx hardhat run scripts/deploy-samples.ts --network localhost
+
+# Deploy to Polygon Amoy
+npx hardhat run scripts/deploy-forwarder.ts --network amoy
+
+# Run tests
+npx hardhat test
+
+# Verify contract on Polygonscan (Amoy)
+npx hardhat verify --network amoy <CONTRACT_ADDRESS>
+```
+
+#### Related Specifications
+
+See [tech.md - Section 4](./tech.md#4-smart-contracts-technical-stack) for detailed technical specifications and implementation details.
+
+For requirements and acceptance criteria:
+- **SPEC**: `.moai/specs/SPEC-CONTRACTS-001/spec.md`
+- **Acceptance**: `.moai/specs/SPEC-CONTRACTS-001/acceptance.md`
+- **Implementation Plan**: `.moai/specs/SPEC-CONTRACTS-001/plan.md`
 
 ### 4.5 packages/examples
 
-**Examples Package** - API usage examples, Smart contract deployment examples
+**Examples Package** - API usage examples and integration examples
 
 | Module | Responsibility |
 |--------|---------------|
@@ -697,8 +776,15 @@ sequenceDiagram
 
 ## Related Documents
 
-- Product Requirements (WHAT/WHY) -> [product.md](./product.md)
-- Technical Details (Docker, API) (HOW) -> [tech.md](./tech.md)
+- **[Product Requirements](./product.md)** (WHAT/WHY)
+  - [Section 3.1: Functional Requirements](./product.md#31-phase-1-direct-tx--gasless-tx--payment-system-integration) - Smart contracts requirements
+  - [Section 6: Milestones](./product.md#6-milestones) - Week 3 completion status
+- **[Technical Details](./tech.md)** (HOW)
+  - [Section 4: Smart Contracts Technical Stack](./tech.md#4-smart-contracts-technical-stack) - Detailed technical specifications
+- **[Docker Setup Guide](./DOCKER_SETUP.md)** - Docker and Hardhat configuration
+- **[SPEC-CONTRACTS-001](../.moai/specs/SPEC-CONTRACTS-001/spec.md)** - Smart Contracts Specification
+  - [Acceptance Criteria](../.moai/specs/SPEC-CONTRACTS-001/acceptance.md)
+  - [Implementation Plan](../.moai/specs/SPEC-CONTRACTS-001/plan.md)
 
 ---
 
@@ -706,6 +792,7 @@ sequenceDiagram
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 12.1 | 2025-12-19 | SPEC-CONTRACTS-001 integration - Added packages/contracts structure to Section 3, Expanded Section 4.4 with deployment artifacts, test suites, and deployment commands, Updated related documents section with SPEC links and cross-references |
 | 12.0 | 2025-12-15 | Document version sync - Complete document structure cleanup, Remove duplicates, Establish cross-reference system |
 | 11.4 | 2025-12-15 | Document role clarification - Add related documents section (cross-references) |
 | 11.3 | 2025-12-15 | Fix section number duplication - Change 1.3 Unified Request Flow to 1.4 (Resolve conflict with 1.3 Multi-Relayer Pool Architecture) |

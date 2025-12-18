@@ -12,8 +12,11 @@
 
 ### Related Documents
 - [Technical Stack and API Spec](./tech.md)
+  - [Section 4: Smart Contracts Technical Stack](./tech.md#4-smart-contracts-technical-stack) - Smart contracts specification
 - [System Architecture](./structure.md)
+  - [Section 4.4: packages/contracts](./structure.md#44-packagescontracts) - Contracts directory structure
 - [Task Master PRD](../.taskmaster/docs/prd.txt)
+- [SPEC-CONTRACTS-001](../.moai/specs/SPEC-CONTRACTS-001/spec.md) - Smart Contracts Specification (ERC2771Forwarder, Sample Contracts)
 
 ---
 
@@ -97,11 +100,13 @@ As OpenZeppelin Defender service will be discontinued in July 2026, we are build
 | OZ Relayer Configuration | config.json (Polygon Amoy/Mainnet) |
 | Local Development Environment | Development/Test environment setup |
 
-**Smart Contracts**:
-| Feature | Description |
-|---------|-------------|
-| ERC2771Forwarder | OpenZeppelin Forwarder deployment |
-| Sample Contracts | ERC20/ERC721 + ERC2771Context examples |
+**Smart Contracts** (SPEC-CONTRACTS-001 Complete):
+| Feature | Description | Status |
+|---------|-------------|--------|
+| ERC2771Forwarder | OpenZeppelin Forwarder deployment | ✅ Deployed |
+| Sample Contracts | ERC20/ERC721 + ERC2771Context examples | ✅ Implemented |
+| Deployment Scripts | Hardhat TypeScript-based deployment | ✅ Ready |
+| Test Suite | Comprehensive unit tests | ✅ Complete |
 
 **API Gateway (Production Level)**:
 | Feature | Description |
@@ -182,13 +187,15 @@ As OpenZeppelin Defender service will be discontinued in July 2026, we are build
 
 ### Phase 1: Payment System Integration (Direct + Gasless)
 
-| Week | Key Objectives |
-|------|----------------|
-| **Week 1** | Infrastructure + API Gateway basic setup |
-| **Week 2** | Direct TX API + OZ Relayer proxy |
-| **Week 3** | ERC2771Forwarder deployment + Gasless TX API |
-| **Week 4** | EIP-712 signature verification + Payment system integration |
-| **Week 5** | Production stabilization + Documentation |
+| Week | Key Objectives | Status |
+|------|---|---|
+| **Week 1** | Infrastructure + API Gateway basic setup | ✅ Complete |
+| **Week 2** | Direct TX API + OZ Relayer proxy | ✅ Complete |
+| **Week 3** | ERC2771Forwarder deployment + Gasless TX API | ✅ Complete |
+| **Week 4** | EIP-712 signature verification + Payment system integration | In Progress |
+| **Week 5** | Production stabilization + Documentation | Planned |
+
+**Week 3 Completion**: Smart contracts package initialized with Hardhat, ERC2771Forwarder deployed, Sample ERC20/ERC721 contracts implemented with ERC2771Context integration. See [SPEC-CONTRACTS-001](../docs/tech.md#smart-contracts-technical-stack) for technical details.
 
 ### Phase 2+: Future Expansion (TBD)
 
@@ -239,6 +246,7 @@ As OpenZeppelin Defender service will be discontinued in July 2026, we are build
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 12.1 | 2025-12-19 | SPEC-CONTRACTS-001 integration - Updated Section 3.1 with contract deployment status, Updated Section 6 milestones with Week 3 completion, Added SPEC links and cross-references |
 | 12.0 | 2025-12-15 | Document version sync - Complete document structure cleanup, Remove duplicates, Establish cross-reference system |
 | 11.3 | 2025-12-15 | Document role clarification - Add related documents section (cross-references) |
 | 11.2 | 2025-12-15 | Document version sync - Apply Docker Compose YAML Anchors pattern (see tech.md, prd.txt) |
