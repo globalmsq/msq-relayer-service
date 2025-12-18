@@ -13,9 +13,16 @@
 
 ### Related Documents
 - [Product Requirements](./product.md) - WHAT/WHY
+  - [Section 3.1: Functional Requirements](./product.md#31-phase-1-direct-tx--gasless-tx--payment-system-integration) - Smart contracts requirements
+  - [Section 6: Milestones](./product.md#6-milestones) - Week 3 completion status
 - [System Architecture](./structure.md) - WHERE
+  - [Section 4.4: packages/contracts](./structure.md#44-packagescontracts) - Contracts directory structure
 - [Docker Setup Guide](./DOCKER_SETUP.md) - Docker configuration and execution
+  - [Hardhat Node Section](./DOCKER_SETUP.md#hardhat-node) - Running Hardhat independently
 - [Task Master PRD](../.taskmaster/docs/prd.txt)
+- **[SPEC-CONTRACTS-001](../.moai/specs/SPEC-CONTRACTS-001/spec.md)** - Smart Contracts Specification
+  - [Acceptance Criteria](../.moai/specs/SPEC-CONTRACTS-001/acceptance.md)
+  - [Implementation Plan](../.moai/specs/SPEC-CONTRACTS-001/plan.md)
 
 ---
 
@@ -85,7 +92,7 @@ Defines the technical stack and implementation specifications for the Blockchain
 
 ## 3. Authentication & Security (SPEC-AUTH-001)
 
-### 3.1 API Key Authentication Guard
+### 3.1 API Key Authentication Guard (Phase 1)
 
 **Overview**: All API requests to protected endpoints require authentication via the `x-api-key` header. The authentication is enforced by a NestJS Global Guard with fail-fast startup validation.
 
@@ -195,46 +202,273 @@ For detailed requirements and acceptance criteria, see:
 | Category | Technology | Version | Rationale |
 |----------|------------|---------|-----------|
 | Library | OpenZeppelin Contracts | 5.3.0 | Proven security, community standard |
-| Framework | Hardhat | 2.x | Development/Testing/Deployment integration |
-| Language | Solidity | 0.8.20 | OZ v5 compatible |
+| Framework | Hardhat | 2.22.0+ | Development/Testing/Deployment integration |
+| Language | Solidity | ^0.8.27 | OZ v5 compatible |
 | Testing | Hardhat Toolbox | 4.x | Testing utilities |
+| Package Manager | pnpm | Latest | Workspace monorepo support |
 
-### 3.1 OpenZeppelin Contract Usage
+### 4.1 Project Structure (SPEC-CONTRACTS-001)
 
-**Minimize custom contracts, maximize usage of OpenZeppelin verified code**
+```
+packages/contracts/
+├── contracts/
+│   ├── forwarder/
+│   │   └── (Uses @openzeppelin/contracts/metatx/ERC2771Forwarder.sol directly)
+│   └── samples/
+│       ├── SampleToken.sol       # ERC20 + ERC2771Context
+│       └── SampleNFT.sol         # ERC721 + ERC2771Context
+├── scripts/
+│   ├── deploy-forwarder.ts       # ERC2771Forwarder deployment
+│   └── deploy-samples.ts         # Sample contracts deployment (localhost only)
+├── test/
+│   ├── forwarder.test.ts         # ERC2771Forwarder unit tests
+│   ├── sample-token.test.ts      # Sample token tests
+│   └── sample-nft.test.ts        # Sample NFT tests
+├── deployments/
+│   ├── localhost/
+│   │   ├── forwarder.json        # Forwarder deployment artifacts
+│   │   ├── sample-token.json     # Sample token artifacts
+│   │   └── sample-nft.json       # Sample NFT artifacts
+│   └── amoy/
+│       └── forwarder.json        # Polygon Amoy forwarder artifacts
+├── hardhat.config.ts
+└── package.json
+```
 
-| Category | Contract to Use | Source |
-|----------|-----------------|--------|
-| **Forwarder** | `ERC2771Forwarder` | @openzeppelin/contracts v5.3.0 |
-| **Target Context** | `ERC2771Context` | @openzeppelin/contracts v5.3.0 |
-| **Security Control** | Policy Engine | NestJS API Gateway (custom) |
+### 4.2 OpenZeppelin Contract Usage
 
-### 3.2 ERC2771Forwarder Features
+**Principle**: Minimize custom contracts, maximize usage of OpenZeppelin verified code
 
-OZ ERC2771Forwarder provides the following features (using 100% OZ code as-is):
+| Category | Contract to Use | Source | Status |
+|----------|-----------------|--------|--------|
+| **Forwarder** | `ERC2771Forwarder` | @openzeppelin/contracts v5.3.0 | ✅ Deployed |
+| **Forwarder Context** | `ERC2771Context` | @openzeppelin/contracts v5.3.0 | ✅ Integrated |
+| **ERC20 Implementation** | `ERC20` | @openzeppelin/contracts v5.3.0 | ✅ Sample |
+| **ERC721 Implementation** | `ERC721` | @openzeppelin/contracts v5.3.0 | ✅ Sample |
+| **Security Control** | Policy Engine | NestJS API Gateway (custom) | Phase 2+ |
 
+### 4.3 ERC2771Forwarder Deployment Details
+
+**Deployment Approach**: OpenZeppelin ERC2771Forwarder is deployed as-is without modifications.
+
+**Deployment Networks**:
+- **Hardhat Node** (localhost, Chain ID: 31337): Auto-deployed by `deploy-forwarder.ts`
+- **Polygon Amoy** (Chain ID: 80002): Manual deployment with network detection
+
+**Deployed Contract Features**:
 - EIP-712 signature verification
-- Nonce management (Nonces.sol)
-- Deadline verification
-- `execute()` - Single execution
-- `executeBatch()` - Batch execution
-- `verify()` - Signature verification
-- `nonces(address)` - Nonce query
+- Nonce management (Per-account nonce tracking)
+- Deadline verification (Validity period checking)
+- `execute()` - Single forward request execution
+- `executeBatch()` - Batch forward request execution
+- `verify()` - Signature verification without execution
+- `nonces(address)` - Query current user nonce
 
-### 3.3 ForwardRequest Structure
+### 4.4 ForwardRequest Structure
 
 ```solidity
-struct ForwardRequestData {
-    address from;      // Original user address
-    address to;        // Target contract address
-    uint256 value;     // ETH transfer amount
-    uint256 gas;       // Gas limit
-    uint256 nonce;     // User nonce
-    uint48 deadline;   // Validity period
-    bytes data;        // Function call data
-    bytes signature;   // EIP-712 signature
+struct ForwardRequest {
+    address from;       // Original user address (signer)
+    address to;         // Target contract address
+    uint256 value;      // ETH transfer amount
+    uint256 gas;        // Gas limit for execution
+    uint256 nonce;      // User nonce (incremented per request)
+    uint48 deadline;    // Validity period (Unix timestamp)
+    bytes data;         // Encoded function call data
 }
 ```
+
+**EIP-712 Signature Domain**:
+```solidity
+Domain {
+    name: "Relayer-Forwarder-{network}",  // e.g., "Relayer-Forwarder-polygon"
+    version: "1",
+    chainId: {network_chain_id},
+    verifyingContract: 0x{forwarder_address}
+}
+```
+
+### 4.5 Sample Contracts (Localhost Only)
+
+**Sample Contracts Implementation** (Only deployed to Hardhat Node):
+
+#### SampleToken.sol (ERC20 + ERC2771Context)
+
+```solidity
+pragma solidity ^0.8.27;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
+
+contract SampleToken is ERC20, ERC2771Context {
+    constructor(address forwarder) ERC20("Sample Token", "SAMPLE") ERC2771Context(forwarder) {
+        _mint(msg.sender, 1000000 * 10 ** 18);
+    }
+
+    function _msgSender() internal view override(ERC20, ERC2771Context) returns (address) {
+        return ERC2771Context._msgSender();
+    }
+
+    function _contextSuffixLength() internal view override(ERC20, ERC2771Context) returns (uint256) {
+        return ERC2771Context._contextSuffixLength();
+    }
+}
+```
+
+**Purpose**: Demonstrates gasless token transfer pattern with meta-transaction support.
+
+#### SampleNFT.sol (ERC721 + ERC2771Context)
+
+```solidity
+pragma solidity ^0.8.27;
+
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
+
+contract SampleNFT is ERC721, ERC2771Context {
+    constructor(address forwarder) ERC721("Sample NFT", "SAMPLE") ERC2771Context(forwarder) {
+        // Constructor implementation
+    }
+
+    function _msgSender() internal view override(ERC721, ERC2771Context) returns (address) {
+        return ERC2771Context._msgSender();
+    }
+
+    function _contextSuffixLength() internal view override(ERC721, ERC2771Context) returns (uint256) {
+        return ERC2771Context._contextSuffixLength();
+    }
+}
+```
+
+**Purpose**: Demonstrates gasless NFT minting pattern with meta-transaction support.
+
+### 4.6 Deployment Script: deploy-forwarder.ts
+
+**Network Detection Logic**:
+
+```typescript
+// Network detection
+const chainId = await ethers.provider.getNetwork().then(n => n.chainId);
+
+if (chainId === 31337) {
+  // Hardhat Node (localhost)
+  console.log('Deploying to Hardhat Node (localhost)');
+  forwarderName = 'Relayer-Forwarder-localhost';
+} else if (chainId === 80002) {
+  // Polygon Amoy
+  console.log('Deploying to Polygon Amoy');
+  forwarderName = 'Relayer-Forwarder-polygon-amoy';
+} else {
+  throw new Error(`Unsupported network: ${chainId}`);
+}
+```
+
+**Deployment Output** (Saved to `deployments/{network}/forwarder.json`):
+
+```json
+{
+  "address": "0x...",
+  "deployer": "0x...",
+  "network": "localhost",
+  "chainId": 31337,
+  "transactionHash": "0x...",
+  "blockNumber": 1,
+  "timestamp": "2025-12-18T00:00:00Z",
+  "name": "Relayer-Forwarder-localhost",
+  "version": "1",
+  "abi": [...]
+}
+```
+
+### 4.7 Sample Deployment Script: deploy-samples.ts
+
+**Deployment Logic**:
+
+```typescript
+// Only deploy to localhost (Hardhat Node)
+const chainId = await ethers.provider.getNetwork().then(n => n.chainId);
+
+if (chainId !== 31337) {
+  console.warn('Skipping sample contract deployment (only supported on localhost)');
+  return;
+}
+
+// Deploy SampleToken and SampleNFT to localhost
+const forwarderAddress = require('./deployments/localhost/forwarder.json').address;
+```
+
+**Deployed Artifacts** (Saved to `deployments/localhost/`):
+
+```json
+{
+  "sampleToken": {
+    "address": "0x...",
+    "deploymentTransaction": "0x...",
+    "blockNumber": 2,
+    "abi": [...]
+  },
+  "sampleNFT": {
+    "address": "0x...",
+    "deploymentTransaction": "0x...",
+    "blockNumber": 3,
+    "abi": [...]
+  }
+}
+```
+
+### 4.8 Test Suite Coverage
+
+**Test Categories**:
+
+| Test File | Test Cases | Coverage |
+|-----------|-----------|----------|
+| `forwarder.test.ts` | Deployment, EIP-712 verification, signature validation, nonce management | High |
+| `sample-token.test.ts` | Gasless transfer, context integration, _msgSender() verification | High |
+| `sample-nft.test.ts` | Gasless minting, context integration, _msgSender() verification | High |
+
+**Example Test**:
+
+```typescript
+describe('ERC2771Forwarder', () => {
+  it('should verify valid EIP-712 signature', async () => {
+    const forwardRequest = {
+      from: userAddress,
+      to: tokenAddress,
+      value: 0,
+      gas: 100000,
+      nonce: 0,
+      deadline: Math.floor(Date.now() / 1000) + 3600,
+      data: encodedFunctionCall
+    };
+
+    const signature = await signForwardRequest(forwardRequest, userPrivateKey);
+    const isValid = await forwarder.verify(forwardRequest, signature);
+    expect(isValid).to.be.true;
+  });
+});
+```
+
+### 4.9 Deployment Verification Process
+
+**For Polygon Amoy**:
+
+1. Deploy contract using `hardhat run scripts/deploy-forwarder.ts --network amoy`
+2. Wait for transaction confirmation
+3. Verify on Block Explorer (Polygonscan)
+4. Save deployment artifact to `deployments/amoy/forwarder.json`
+
+**Verification Command**:
+
+```bash
+npx hardhat verify --network amoy <CONTRACT_ADDRESS> --constructor-args scripts/args.js
+```
+
+### 4.10 Related Specifications
+
+For detailed requirements and acceptance criteria, see:
+- **SPEC Document**: `.moai/specs/SPEC-CONTRACTS-001/spec.md`
+- **Acceptance Criteria**: `.moai/specs/SPEC-CONTRACTS-001/acceptance.md`
+- **Implementation Plan**: `.moai/specs/SPEC-CONTRACTS-001/plan.md`
 
 ---
 
@@ -1864,6 +2098,7 @@ const queueUrl = process.env.AWS_SQS_QUEUE_URL;
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 12.4 | 2025-12-19 | Section 4 Smart Contracts expansion - Replaced basic overview with comprehensive SPEC-CONTRACTS-001 integration (Section 4.1-4.10): project structure, OpenZeppelin usage, ERC2771Forwarder deployment, sample contracts, deployment scripts, test coverage, verification process, related specifications |
 | 12.3 | 2025-12-16 | Phase 1 completion - Updated version and status to reflect Phase 1 complete, added Docker Setup Guide cross-reference |
 | 12.2 | 2025-12-15 | Section 5.5 Health Check API expansion - Added Relayer Pool Status Aggregation NestJS implementation example (HealthService, checkRelayerPoolHealth, aggregateStatus), Added Detailed Health Response JSON example (including degraded status) |
 | 12.1 | 2025-12-15 | API response format standardization - Unified Section 5.1-5.4 responses to Section 5.8 standard format (success/data/timestamp wrapper applied), Added standard response format guide at Section 5 start |

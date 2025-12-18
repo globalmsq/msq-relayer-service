@@ -133,7 +133,27 @@ docker compose -f docker/docker-compose.yaml build
 
 # View built images
 docker images | grep msq
+
+# Build specific service (e.g., Hardhat Node)
+docker compose -f docker/docker-compose.yaml build hardhat-node
+
+# Build with no cache (for fresh builds)
+docker compose -f docker/docker-compose.yaml build --no-cache
 ```
+
+#### Hardhat Node Build
+
+The `hardhat-node` service is built using a multi-stage Dockerfile:
+
+**Build Target**: `hardhat-node` (defined in `docker/Dockerfile.packages`)
+
+**Build Process**:
+1. Install Node.js and dependencies
+2. Install project dependencies (pnpm)
+3. Compile smart contracts with Hardhat
+4. Expose RPC port 8545
+
+**Health Check**: HTTP request to `http://localhost:8545` with JSON-RPC call
 
 ---
 
@@ -577,12 +597,54 @@ docker system prune -a --volumes
 
 - [README.md](../README.md) - Project overview and quick start
 - [docs/tech.md](./tech.md) - Technical specifications
+  - [Section 4: Smart Contracts Technical Stack](./tech.md#4-smart-contracts-technical-stack) - Hardhat configuration details
 - [docs/product.md](./product.md) - Product requirements
 - [docs/structure.md](./structure.md) - System architecture
 - [.moai/specs/SPEC-INFRA-001/spec.md](../.moai/specs/SPEC-INFRA-001/spec.md) - Infrastructure SPEC
+- [.moai/specs/SPEC-CONTRACTS-001/spec.md](../.moai/specs/SPEC-CONTRACTS-001/spec.md) - Smart Contracts SPEC
+
+## Hardhat Node
+
+### Running Hardhat Node Independently
+
+To run Hardhat Node without Docker:
+
+```bash
+cd packages/contracts
+npx hardhat node
+```
+
+This starts a local Hardhat network on `http://localhost:8545`.
+
+### Smart Contract Deployment via Hardhat
+
+Deploy contracts to Hardhat Node:
+
+```bash
+cd packages/contracts
+
+# Deploy ERC2771Forwarder
+npx hardhat run scripts/deploy-forwarder.ts --network localhost
+
+# Deploy sample contracts (SampleToken, SampleNFT)
+npx hardhat run scripts/deploy-samples.ts --network localhost
+
+# Run tests
+npx hardhat test
+```
+
+See [SPEC-CONTRACTS-001](../.moai/specs/SPEC-CONTRACTS-001/spec.md) for detailed contract specifications.
 
 ---
 
-**Last Updated**: 2025-12-16
+**Last Updated**: 2025-12-19
 **Maintained by**: manager-docs
 **Status**: Phase 1 Complete
+**Version**: 1.1.0
+
+## Version History
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.1.0 | 2025-12-19 | Added Hardhat Node build section and deployment information, Added SPEC-CONTRACTS-001 links, Added independent Hardhat Node execution commands |
+| 1.0.0 | 2025-12-16 | Initial Docker Setup Guide creation |
