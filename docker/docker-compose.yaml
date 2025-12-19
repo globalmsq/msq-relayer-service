@@ -108,6 +108,8 @@ services:
         condition: service_healthy
       oz-relayer-3:
         condition: service_healthy
+      oz-relayer-lb:
+        condition: service_healthy
     environment:
       NODE_ENV: development
       REDIS_URL: redis://redis:6379
@@ -157,6 +159,28 @@ services:
     environment:
       <<: *relayer-env
       API_KEY: test-api-key-relayer-3-local-dev-32ch
+
+  # === Nginx Load Balancer (SPEC-PROXY-001) ===
+  oz-relayer-lb:
+    image: nginx:alpine
+    container_name: oz-relayer-lb
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - oz-relayer-1
+      - oz-relayer-2
+      - oz-relayer-3
+    networks:
+      - msq-relayer-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
 
   # === Phase 2+: Services (commented, enabled via profiles) ===
   # oz-monitor:
