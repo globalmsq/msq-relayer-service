@@ -119,7 +119,7 @@
         "id": "9",
         "title": "Transaction Status 조회 API 및 Webhook 핸들러 구현",
         "description": "GET /api/v1/relay/status/{txId} 엔드포인트 (Phase 1 - 폴링 방식)와 OZ Relayer Webhook 이벤트 처리 핸들러 (Phase 2+)를 구현합니다.",
-        "status": "in-progress",
+        "status": "done",
         "dependencies": [
           "6"
         ],
@@ -173,7 +173,7 @@
             "parentId": "undefined"
           }
         ],
-        "updatedAt": "2025-12-22T15:40:09.191Z"
+        "updatedAt": "2025-12-22T15:42:02.137Z"
       },
       {
         "id": "10",
@@ -236,9 +236,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2025-12-22T15:40:09.192Z",
+      "lastModified": "2025-12-22T15:42:02.137Z",
       "taskCount": 13,
-      "completedCount": 8,
+      "completedCount": 9,
       "tags": [
         "master"
       ]
