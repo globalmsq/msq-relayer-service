@@ -101,7 +101,7 @@ services:
     profiles: ["manual"]
     depends_on:
       relay-api:
-        condition: service_started
+        condition: service_healthy
       oz-relayer-1:
         condition: service_healthy
     environment:
