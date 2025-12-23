@@ -91,6 +91,30 @@ services:
       <<: *relayer-env
       API_KEY: amoy-oz-relayer-shared-api-key-32ch
 
+  # === Integration Tests (profile: test) ===
+  # Run with: docker compose -f docker-compose-amoy.yaml --profile test up integration-tests
+  integration-tests:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.packages
+      target: integration-tests
+    profiles: ["test"]
+    depends_on:
+      relay-api:
+        condition: service_started
+      oz-relayer-1:
+        condition: service_healthy
+    environment:
+      RPC_URL: https://rpc-amoy.polygon.technology
+      CHAIN_ID: 80002
+      FORWARDER_ADDRESS: "0xF034a404241707F347A952Cd4095f9035AF877Bf"
+      RELAY_API_URL: http://relay-api:3000
+      RELAY_API_KEY: amoy-dev-api-key
+      OZ_RELAYER_URL: http://oz-relayer-1:8080
+      OZ_RELAYER_API_KEY: amoy-oz-relayer-shared-api-key-32ch
+    networks:
+      - msq-relayer-network
+
 networks:
   msq-relayer-network:
     driver: bridge

@@ -142,7 +142,8 @@ services:
   integration-tests:
     build:
       context: ..
-      dockerfile: packages/integration-tests/Dockerfile
+      dockerfile: docker/Dockerfile.packages
+      target: integration-tests
     profiles: ["test"]
     depends_on:
       relay-api:

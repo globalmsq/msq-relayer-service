@@ -97,3 +97,23 @@ ENV CHAIN_ID=31337
 
 # Deploy contracts to localhost
 CMD ["pnpm", "run", "deploy:local"]
+
+# ============================================================================
+# INTEGRATION-TESTS TARGET: Jest integration test runner
+# ============================================================================
+FROM base AS integration-tests
+
+# Copy relay-api for test imports
+COPY packages/relay-api ./packages/relay-api
+
+# Copy integration-tests package
+COPY packages/integration-tests ./packages/integration-tests
+
+# Set working directory
+WORKDIR /app/packages/integration-tests
+
+# Install package-specific dependencies
+RUN pnpm install
+
+# Default command: run tests
+CMD ["pnpm", "test"]
