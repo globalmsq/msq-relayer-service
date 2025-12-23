@@ -19,8 +19,9 @@ RUN apk add --no-cache \
 # Copy package files for pnpm workspace
 COPY package.json pnpm-workspace.yaml ./
 COPY pnpm-lock.yaml* ./
+COPY .npmrc* ./
 
-# Install dependencies using pnpm
+# Install dependencies using pnpm (optional=false skips playwright)
 RUN pnpm install --frozen-lockfile || pnpm install
 
 # ============================================================================

@@ -137,14 +137,14 @@ services:
       <<: *relayer-env
       API_KEY: oz-relayer-shared-api-key-local-dev
 
-  # === Integration Tests (profile: test) ===
-  # Run with: docker compose --profile test up integration-tests
+  # === Integration Tests (profile: manual) ===
+  # Run with: docker compose run --rm integration-tests
   integration-tests:
     build:
       context: ..
       dockerfile: docker/Dockerfile.packages
       target: integration-tests
-    profiles: ["test"]
+    profiles: ["manual"]
     depends_on:
       relay-api:
         condition: service_started
