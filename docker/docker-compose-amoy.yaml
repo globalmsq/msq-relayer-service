@@ -20,9 +20,9 @@ x-relayer-common: &relayer-common
 
 x-relayer-env: &relayer-env
   RUST_LOG: info
-  RELAY_API_KEY: amoy-dev-api-key
-  KEYSTORE_PASSPHRASE: amoy-test-passphrase
-  WEBHOOK_SIGNING_KEY: amoy-dev-webhook-signing-key-32ch
+  RELAY_API_KEY: ${RELAY_API_KEY:-amoy-dev-api-key}
+  KEYSTORE_PASSPHRASE: ${KEYSTORE_PASSPHRASE:-amoy-test-passphrase}
+  WEBHOOK_SIGNING_KEY: ${WEBHOOK_SIGNING_KEY:-amoy-dev-webhook-signing-key-32ch}
   RPC_URL: https://rpc-amoy.polygon.technology
   REDIS_URL: redis://redis:6379
 
@@ -65,13 +65,13 @@ services:
       NODE_ENV: staging
       REDIS_URL: redis://redis:6379
       RPC_URL: https://rpc-amoy.polygon.technology
-      RELAY_API_KEY: amoy-dev-api-key
+      RELAY_API_KEY: ${RELAY_API_KEY:-amoy-dev-api-key}
       CHAIN_ID: 80002
       FORWARDER_ADDRESS: "0xF034a404241707F347A952Cd4095f9035AF877Bf"
       # Direct connection to single OZ Relayer for consistent relayer ID
       # (Load balancer causes ID mismatch between getRelayerId and sendTransaction)
       OZ_RELAYER_URL: http://oz-relayer-1:8080
-      OZ_RELAYER_API_KEY: amoy-oz-relayer-shared-api-key-32ch
+      OZ_RELAYER_API_KEY: ${OZ_RELAYER_API_KEY:-amoy-oz-relayer-shared-api-key-32ch}
     networks:
       - msq-relayer-network
     restart: unless-stopped
@@ -89,7 +89,7 @@ services:
       - ./keys/relayer-1:/app/config/keys:ro
     environment:
       <<: *relayer-env
-      API_KEY: amoy-oz-relayer-shared-api-key-32ch
+      API_KEY: ${OZ_RELAYER_API_KEY:-amoy-oz-relayer-shared-api-key-32ch}
 
   # === Integration Tests (profile: manual) ===
   # Run with: docker compose -f docker-compose-amoy.yaml run --rm integration-tests
@@ -109,9 +109,9 @@ services:
       CHAIN_ID: 80002
       FORWARDER_ADDRESS: "0xF034a404241707F347A952Cd4095f9035AF877Bf"
       RELAY_API_URL: http://relay-api:3000
-      RELAY_API_KEY: amoy-dev-api-key
+      RELAY_API_KEY: ${RELAY_API_KEY:-amoy-dev-api-key}
       OZ_RELAYER_URL: http://oz-relayer-1:8080
-      OZ_RELAYER_API_KEY: amoy-oz-relayer-shared-api-key-32ch
+      OZ_RELAYER_API_KEY: ${OZ_RELAYER_API_KEY:-amoy-oz-relayer-shared-api-key-32ch}
     networks:
       - msq-relayer-network
 

@@ -21,9 +21,9 @@ x-relayer-common: &relayer-common
 
 x-relayer-env: &relayer-env
   RUST_LOG: info
-  RELAY_API_KEY: local-dev-api-key
-  KEYSTORE_PASSPHRASE: hardhat-test-passphrase
-  WEBHOOK_SIGNING_KEY: local-dev-webhook-signing-key-32ch
+  RELAY_API_KEY: ${RELAY_API_KEY:-local-dev-api-key}
+  KEYSTORE_PASSPHRASE: ${KEYSTORE_PASSPHRASE:-hardhat-test-passphrase}
+  WEBHOOK_SIGNING_KEY: ${WEBHOOK_SIGNING_KEY:-local-dev-webhook-signing-key-32ch}
   RPC_URL: http://hardhat-node:8545
   REDIS_URL: redis://redis:6379
 
@@ -111,13 +111,13 @@ services:
       NODE_ENV: development
       REDIS_URL: redis://redis:6379
       RPC_URL: http://hardhat-node:8545
-      RELAY_API_KEY: local-dev-api-key
+      RELAY_API_KEY: ${RELAY_API_KEY:-local-dev-api-key}
       CHAIN_ID: 31337
       FORWARDER_ADDRESS: "0x5FbDB2315678afecb367f032d93F642f64180aa3"
       # Direct connection to single OZ Relayer for consistent relayer ID
       # (Load balancer causes ID mismatch between getRelayerId and sendTransaction)
       OZ_RELAYER_URL: http://oz-relayer-1:8080
-      OZ_RELAYER_API_KEY: oz-relayer-shared-api-key-local-dev
+      OZ_RELAYER_API_KEY: ${OZ_RELAYER_API_KEY:-oz-relayer-shared-api-key-local-dev}
     networks:
       - msq-relayer-network
     restart: unless-stopped
@@ -135,7 +135,7 @@ services:
       - ./keys/relayer-1:/app/config/keys:ro
     environment:
       <<: *relayer-env
-      API_KEY: oz-relayer-shared-api-key-local-dev
+      API_KEY: ${OZ_RELAYER_API_KEY:-oz-relayer-shared-api-key-local-dev}
 
   # === Integration Tests (profile: manual) ===
   # Run with: docker compose run --rm integration-tests
@@ -155,9 +155,9 @@ services:
       CHAIN_ID: 31337
       FORWARDER_ADDRESS: "0x5FbDB2315678afecb367f032d93F642f64180aa3"
       RELAY_API_URL: http://relay-api:3000
-      RELAY_API_KEY: local-dev-api-key
+      RELAY_API_KEY: ${RELAY_API_KEY:-local-dev-api-key}
       OZ_RELAYER_URL: http://oz-relayer-1:8080
-      OZ_RELAYER_API_KEY: oz-relayer-shared-api-key-local-dev
+      OZ_RELAYER_API_KEY: ${OZ_RELAYER_API_KEY:-oz-relayer-shared-api-key-local-dev}
     networks:
       - msq-relayer-network
 

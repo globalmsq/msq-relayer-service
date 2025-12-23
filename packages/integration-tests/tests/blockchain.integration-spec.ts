@@ -177,9 +177,15 @@ describe('Blockchain Integration Tests', () => {
         expect(nonce).toBeGreaterThanOrEqual(0n);
         console.log(`   ✅ User nonce: ${nonce}`);
       } catch (error) {
-        // Forwarder might not be deployed on some networks
-        console.log(`   ⚠️ Forwarder not deployed at ${networkConfig.forwarderAddress}`);
-        expect(error).toBeDefined();
+        // Check if contract exists at the address
+        const code = await provider.getCode(networkConfig.forwarderAddress);
+        if (code === '0x') {
+          // Forwarder contract not deployed - gracefully skip
+          console.warn(`   ⚠️ Skipping: Forwarder contract not found at ${networkConfig.forwarderAddress}`);
+          return;
+        }
+        // Contract exists but call failed - re-throw to fail the test
+        throw error;
       } finally {
         provider.destroy();
       }
