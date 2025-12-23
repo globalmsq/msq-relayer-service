@@ -51,35 +51,26 @@ describe('Blockchain Integration Tests', () => {
     networkConfig = getNetworkConfig();
     logNetworkConfig();
 
+    // Shared config map for ConfigService mock (DRY principle)
+    const configMap: Record<string, unknown> = {
+      OZ_RELAYER_URL: process.env.OZ_RELAYER_URL || 'https://api.defender.openzeppelin.com',
+      OZ_RELAYER_API_KEY: process.env.OZ_RELAYER_API_KEY || 'test-oz-api-key',
+      RELAY_API_KEY: process.env.RELAY_API_KEY || 'test-api-key',
+      apiKey: process.env.RELAY_API_KEY || 'test-api-key',
+      FORWARDER_ADDRESS: networkConfig.forwarderAddress,
+      FORWARDER_NAME: 'ERC2771Forwarder',
+      CHAIN_ID: networkConfig.chainId,
+      RPC_URL: networkConfig.rpcUrl,
+    };
+
     // Create real NestJS application (no mocks for integration tests)
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
       .overrideProvider(ConfigService)
       .useValue({
-        get: jest.fn((key: string, defaultValue?: unknown) => {
-          const configMap: Record<string, unknown> = {
-            OZ_RELAYER_URL: process.env.OZ_RELAYER_URL || 'https://api.defender.openzeppelin.com',
-            OZ_RELAYER_API_KEY: process.env.OZ_RELAYER_API_KEY || 'test-oz-api-key',
-            RELAY_API_KEY: process.env.RELAY_API_KEY || 'test-api-key',
-            apiKey: process.env.RELAY_API_KEY || 'test-api-key',
-            FORWARDER_ADDRESS: networkConfig.forwarderAddress,
-            FORWARDER_NAME: 'ERC2771Forwarder',
-            CHAIN_ID: networkConfig.chainId,
-            RPC_URL: networkConfig.rpcUrl,
-          };
-          return configMap[key] ?? defaultValue;
-        }),
+        get: jest.fn((key: string, defaultValue?: unknown) => configMap[key] ?? defaultValue),
         getOrThrow: jest.fn((key: string) => {
-          const configMap: Record<string, unknown> = {
-            OZ_RELAYER_URL: process.env.OZ_RELAYER_URL || 'https://api.defender.openzeppelin.com',
-            OZ_RELAYER_API_KEY: process.env.OZ_RELAYER_API_KEY || 'test-oz-api-key',
-            RELAY_API_KEY: process.env.RELAY_API_KEY || 'test-api-key',
-            FORWARDER_ADDRESS: networkConfig.forwarderAddress,
-            FORWARDER_NAME: 'ERC2771Forwarder',
-            CHAIN_ID: networkConfig.chainId,
-            RPC_URL: networkConfig.rpcUrl,
-          };
           const value = configMap[key];
           if (value === undefined) throw new Error(`Config key ${key} not found`);
           return value;

@@ -313,8 +313,8 @@ describe('Error Scenarios E2E Tests', () => {
         .get(`/api/v1/relay/status/${invalidTransactionId}`)
         .set('x-api-key', 'test-api-key');
 
-      // Then: Should return 400 or 404
-      expect([400, 404]).toContain(response.status);
+      // Then: Should return 400 Bad Request (UUID format validation fails first)
+      expect(response.status).toBe(400);
     });
   });
 });

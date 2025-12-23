@@ -52,7 +52,9 @@ const config: HardhatUserConfig = {
     },
   },
   etherscan: {
-    apiKey: ETHERSCAN_API_KEY,
+    apiKey: {
+      external: ETHERSCAN_API_KEY,
+    },
     customChains: [
       {
         network: "external",
