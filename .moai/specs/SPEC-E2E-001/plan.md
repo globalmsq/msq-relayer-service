@@ -8,7 +8,7 @@
 | **제목** | E2E 테스트 인프라 및 결제 시스템 연동 검증 |
 | **총 예상 시간** | ~4시간 (4 Phase) |
 | **파일 변경** | 신규 11개, 수정 1개 |
-| **테스트 케이스** | 27개 (5개 카테고리) |
+| **테스트 케이스** | 29개 (5개 카테고리) |
 
 ---
 
@@ -181,10 +181,10 @@ export const TEST_CONFIG = {
 
 **내용**:
 ```typescript
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 
 export const createMockOzRelayerResponse = (overrides?: Partial<any>) => ({
-  transactionId: uuidv4(),
+  transactionId: randomUUID(),
   hash: null,
   status: 'pending',
   createdAt: new Date().toISOString(),
@@ -192,7 +192,7 @@ export const createMockOzRelayerResponse = (overrides?: Partial<any>) => ({
 });
 
 export const createMockConfirmedResponse = (overrides?: Partial<any>) => ({
-  transactionId: uuidv4(),
+  transactionId: randomUUID(),
   hash: '0x' + '1'.repeat(64),
   status: 'confirmed',
   createdAt: new Date().toISOString(),
@@ -201,7 +201,7 @@ export const createMockConfirmedResponse = (overrides?: Partial<any>) => ({
 });
 
 export const createMockFailedResponse = (overrides?: Partial<any>) => ({
-  transactionId: uuidv4(),
+  transactionId: randomUUID(),
   hash: null,
   status: 'failed',
   createdAt: new Date().toISOString(),
@@ -321,15 +321,27 @@ export async function createTestApp(): Promise<INestApplication> {
   })
     .overrideProvider(ConfigService)
     .useValue({
-      get: jest.fn((key: string) => {
-        const config = {
+      get: jest.fn((key: string, defaultValue?: any) => {
+        const config: Record<string, any> = {
           'OZ_RELAYER_URL': TEST_CONFIG.oz_relayer.url,
           'OZ_RELAYER_API_KEY': TEST_CONFIG.oz_relayer.api_key,
           'FORWARDER_ADDRESS': TEST_CONFIG.forwarder.address,
           'CHAIN_ID': TEST_CONFIG.forwarder.chain_id,
           'API_KEY': TEST_CONFIG.api.key,
         };
-        return config[key];
+        return config[key] ?? defaultValue;
+      }),
+      getOrThrow: jest.fn((key: string) => {
+        const config: Record<string, any> = {
+          'OZ_RELAYER_URL': TEST_CONFIG.oz_relayer.url,
+          'OZ_RELAYER_API_KEY': TEST_CONFIG.oz_relayer.api_key,
+          'FORWARDER_ADDRESS': TEST_CONFIG.forwarder.address,
+          'CHAIN_ID': TEST_CONFIG.forwarder.chain_id,
+          'API_KEY': TEST_CONFIG.api.key,
+        };
+        const value = config[key];
+        if (value === undefined) throw new Error(`Config key ${key} not found`);
+        return value;
       }),
     })
     .compile();
@@ -349,13 +361,39 @@ export async function createTestApp(): Promise<INestApplication> {
 }
 ```
 
+#### 2.8 Nonce Mock 전략
+
+**문제**: `GET /api/v1/relay/gasless/nonce/:address`가 실제 RPC 호출 (Forwarder contract)을 수행
+
+**해결 방법**: Jest Spy로 GaslessService.getNonce 메서드를 Mock
+
+**구현** (test-app.factory.ts에 추가):
+```typescript
+// Option 1: GaslessService Mock
+const gaslessService = app.get(GaslessService);
+jest.spyOn(gaslessService, 'getNonce').mockResolvedValue(0n);
+
+// Option 2: HttpService Mock (RPC 호출 차단)
+const httpService = app.get(HttpService);
+jest.spyOn(httpService, 'post').mockImplementation((url) => {
+  if (url.includes('nonces')) {
+    return of({ data: { result: '0x0' } } as AxiosResponse);
+  }
+  return originalPost(url);
+});
+```
+
+**적용 테스트 케이스**:
+- TC-E2E-G003: Nonce 조회 → 200 OK + nonce: 0
+- TC-E2E-G008: Nonce 불일치 → 400 Bad Request
+
 ### 예상 산출물 (Deliverables)
 - ✅ `test-wallets.ts` - Hardhat 계정 #0~#2
 - ✅ `test-config.ts` - 테스트 환경 설정
-- ✅ `mock-responses.ts` - OZ Relayer Mock 응답 팩토리
+- ✅ `mock-responses.ts` - OZ Relayer Mock 응답 팩토리 (crypto.randomUUID() 사용)
 - ✅ `eip712-signer.ts` - EIP-712 서명 유틸리티 (3개 함수)
 - ✅ `encoding.ts` - ERC-20 transfer 인코딩
-- ✅ `test-app.factory.ts` - NestJS 테스트 앱 팩토리
+- ✅ `test-app.factory.ts` - NestJS 테스트 앱 팩토리 (ConfigService.getOrThrow 포함)
 
 ### 검증 기준 (Verification)
 ```bash
@@ -371,7 +409,7 @@ node -e "const { TEST_WALLETS } = require('./test/fixtures/test-wallets'); conso
 ## Phase 3: E2E 테스트 스위트 작성 (2.5시간)
 
 ### 목표 (Goal)
-- 5개 E2E 테스트 파일 작성 (27개 테스트 케이스)
+- 5개 E2E 테스트 파일 작성 (29개 테스트 케이스)
 - Mock OZ Relayer 응답 설정
 - Given-When-Then 형식 주석 포함
 
@@ -381,7 +419,7 @@ node -e "const { TEST_WALLETS } = require('./test/fixtures/test-wallets'); conso
 
 **파일**: `packages/relay-api/test/e2e/direct.e2e-spec.ts` (신규)
 
-**테스트 케이스** (7개):
+**테스트 케이스** (8개):
 1. TC-E2E-D001: 유효한 Direct TX → 202 Accepted
 2. TC-E2E-D002: 최소 필드만 포함 → 202 Accepted
 3. TC-E2E-D003: 잘못된 이더리움 주소 → 400 Bad Request
@@ -389,6 +427,7 @@ node -e "const { TEST_WALLETS } = require('./test/fixtures/test-wallets'); conso
 5. TC-E2E-D005: 잘못된 speed enum → 400 Bad Request
 6. TC-E2E-D006: API key 누락 → 401 Unauthorized
 7. TC-E2E-D007: 잘못된 API key → 401 Unauthorized
+8. TC-E2E-D008: OZ Relayer 불가 → 503 Service Unavailable
 
 **구조**:
 ```typescript
@@ -487,12 +526,13 @@ describe('Gasless Transaction E2E Tests', () => {
 
 **파일**: `packages/relay-api/test/e2e/status.e2e-spec.ts` (신규)
 
-**테스트 케이스** (5개):
+**테스트 케이스** (6개):
 1. TC-E2E-S001: Pending 상태 조회 → 200 + status: pending
 2. TC-E2E-S002: Confirmed 상태 조회 → 200 + hash + confirmedAt
 3. TC-E2E-S003: Failed 상태 조회 → 200 + status: failed
 4. TC-E2E-S004: 잘못된 UUID 형식 → 400 Bad Request
 5. TC-E2E-S005: OZ Relayer 불가 → 503 Service Unavailable
+6. TC-E2E-S006: 존재하지 않는 txId → 404 Not Found
 
 #### 3.4 Health Check E2E 테스트
 
@@ -555,9 +595,9 @@ describe('Payment Integration E2E Tests', () => {
 ```
 
 ### 예상 산출물 (Deliverables)
-- ✅ `direct.e2e-spec.ts` - 7개 테스트 케이스
+- ✅ `direct.e2e-spec.ts` - 8개 테스트 케이스
 - ✅ `gasless.e2e-spec.ts` - 10개 테스트 케이스
-- ✅ `status.e2e-spec.ts` - 5개 테스트 케이스
+- ✅ `status.e2e-spec.ts` - 6개 테스트 케이스
 - ✅ `health.e2e-spec.ts` - 3개 테스트 케이스
 - ✅ `payment-integration.e2e-spec.ts` - 2개 테스트 케이스
 
@@ -566,7 +606,7 @@ describe('Payment Integration E2E Tests', () => {
 # E2E 테스트 실행
 pnpm --filter @msq-relayer/relay-api test:e2e
 
-# 예상 출력: 27 tests passed
+# 예상 출력: 29 tests passed
 ```
 
 ---
@@ -596,7 +636,7 @@ pnpm --filter @msq-relayer/relay-api test
 # E2E 테스트 실행
 pnpm --filter @msq-relayer/relay-api test:e2e
 
-# 예상 출력: 27 tests passed
+# 예상 출력: 29 tests passed
 ```
 
 #### 4.3 E2E 테스트 커버리지
@@ -617,12 +657,12 @@ task-master set-status --id=11 --status=done
 
 ### 예상 산출물 (Deliverables)
 - ✅ 모든 유닛 테스트 통과 (회귀 없음)
-- ✅ 27개 E2E 테스트 케이스 통과
+- ✅ 29개 E2E 테스트 케이스 통과
 - ✅ TaskMaster Task #11 완료 상태
 
 ### 검증 기준 (Verification)
 - ✅ `pnpm test` 성공 (유닛 테스트 회귀 없음)
-- ✅ `pnpm test:e2e` 성공 (27개 테스트 통과)
+- ✅ `pnpm test:e2e` 성공 (29개 테스트 통과)
 - ✅ TaskMaster 상태: Task #11 → done
 
 ---
@@ -715,9 +755,9 @@ git merge feature/SPEC-E2E-001
 ## 성공 기준
 
 ### 기능 검증
-✅ Direct Transaction API 7개 테스트 통과
+✅ Direct Transaction API 8개 테스트 통과
 ✅ Gasless Transaction API 10개 테스트 통과
-✅ Status Polling API 5개 테스트 통과
+✅ Status Polling API 6개 테스트 통과
 ✅ Health Check API 3개 테스트 통과
 ✅ Payment Integration 2개 시나리오 통과
 

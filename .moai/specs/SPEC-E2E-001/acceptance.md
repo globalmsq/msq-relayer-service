@@ -299,7 +299,7 @@ GET /api/v1/relay/status/{txId}
 ## 추가 검증 기준
 
 ### AC-E2E-001: Direct Transaction API 검증
-- ✅ 7개 테스트 케이스 모두 통과
+- ✅ 8개 테스트 케이스 모두 통과
 - ✅ 유효성 검증, 인증, 에러 처리 커버
 
 ### AC-E2E-002: Gasless Transaction API 검증
@@ -307,7 +307,7 @@ GET /api/v1/relay/status/{txId}
 - ✅ 서명 검증, Nonce, 에러 처리 커버
 
 ### AC-E2E-003: Status Polling API 검증
-- ✅ 5개 테스트 케이스 모두 통과
+- ✅ 6개 테스트 케이스 모두 통과
 - ✅ 상태 조회, 404/503 에러 커버
 
 ### AC-E2E-004: Health Check API 검증
@@ -323,7 +323,7 @@ GET /api/v1/relay/status/{txId}
 ## 품질 게이트
 
 ### 테스트 통과 기준
-- ✅ **27개 E2E 테스트 케이스 모두 통과** (Pass rate: 100%)
+- ✅ **29개 E2E 테스트 케이스 모두 통과** (Pass rate: 100%)
 - ✅ **기존 유닛 테스트 회귀 없음** (`pnpm test` 성공)
 - ✅ **E2E 테스트 실행 시간 30초 이내** (Mock 기반, 빠른 피드백)
 
@@ -362,16 +362,16 @@ GET /api/v1/relay/status/{txId}
 - [ ] `npx tsc --noEmit` 성공 (TypeScript 컴파일 오류 없음)
 
 ### Phase 3: E2E 테스트 스위트
-- [ ] `test/e2e/direct.e2e-spec.ts` 생성 확인 (7 tests)
+- [ ] `test/e2e/direct.e2e-spec.ts` 생성 확인 (8 tests)
 - [ ] `test/e2e/gasless.e2e-spec.ts` 생성 확인 (10 tests)
-- [ ] `test/e2e/status.e2e-spec.ts` 생성 확인 (5 tests)
+- [ ] `test/e2e/status.e2e-spec.ts` 생성 확인 (6 tests)
 - [ ] `test/e2e/health.e2e-spec.ts` 생성 확인 (3 tests)
 - [ ] `test/e2e/payment-integration.e2e-spec.ts` 생성 확인 (2 tests)
-- [ ] `pnpm test:e2e` → 27 tests passed
+- [ ] `pnpm test:e2e` → 29 tests passed
 
 ### Phase 4: 최종 검증
 - [ ] `pnpm test` → All tests passed (유닛 테스트 회귀 없음)
-- [ ] `pnpm test:e2e` → 27/27 tests passed
+- [ ] `pnpm test:e2e` → 29/29 tests passed
 - [ ] E2E 테스트 실행 시간 < 30초
 - [ ] `task-master set-status --id=11 --status=done` 실행
 
@@ -381,7 +381,7 @@ GET /api/v1/relay/status/{txId}
 
 | 메트릭 | 목표 | 실제 |
 |--------|------|------|
-| **E2E 테스트 통과율** | 100% (27/27) | [구현 후 기록] |
+| **E2E 테스트 통과율** | 100% (29/29) | [구현 후 기록] |
 | **유닛 테스트 회귀** | 0건 | [구현 후 기록] |
 | **E2E 실행 시간** | < 30초 | [구현 후 기록] |
 | **TypeScript 오류** | 0건 | [구현 후 기록] |
@@ -422,7 +422,7 @@ GET /api/v1/relay/status/{txId}
 
 본 SPEC은 다음 조건을 **모두 만족**할 때 승인됩니다:
 
-✅ **기능 검증**: 27개 E2E 테스트 케이스 모두 통과
+✅ **기능 검증**: 29개 E2E 테스트 케이스 모두 통과
 ✅ **품질 검증**: 유닛 테스트 회귀 없음, TypeScript 오류 없음
 ✅ **문서화**: Given-When-Then 주석, TESTING.md 업데이트
 ✅ **실행 시간**: E2E 테스트 30초 이내 완료

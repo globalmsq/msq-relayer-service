@@ -1,6 +1,6 @@
 ---
 id: SPEC-E2E-001
-version: "1.0.0"
+version: "1.0.1"
 status: "draft"
 created: "2025-12-23"
 updated: "2025-12-23"
@@ -15,6 +15,7 @@ priority: "high"
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0.0 | 2025-12-23 | Harry | 초안 작성 - E2E 테스트 인프라 구축 및 결제 시스템 검증 |
+| 1.0.1 | 2025-12-23 | Harry | 검토 결과 반영 - TC-E2E-S006 추가, 테스트 수 29개로 수정, Nonce Mock 전략 및 ConfigService.getOrThrow 보완 |
 
 ## 개요
 
@@ -171,6 +172,7 @@ E2E Test Suite
 - TC-E2E-S003: Failed 상태 조회 → 200 + status: failed
 - TC-E2E-S004: 잘못된 UUID 형식 → 400 Bad Request
 - TC-E2E-S005: OZ Relayer 불가 → 503 Service Unavailable
+- TC-E2E-S006: 존재하지 않는 txId → 404 Not Found
 
 ### U-E2E-004: Health Check E2E 테스트 (Ubiquitous - 필수)
 **WHEN** 시스템이 `/api/v1/health` 엔드포인트를 제공할 때
@@ -257,9 +259,9 @@ E2E Test Suite
 ```
 packages/relay-api/test/
 ├── e2e/                             # E2E 테스트 스위트
-│   ├── direct.e2e-spec.ts          # Direct TX (7 tests)
+│   ├── direct.e2e-spec.ts          # Direct TX (8 tests)
 │   ├── gasless.e2e-spec.ts         # Gasless TX (10 tests)
-│   ├── status.e2e-spec.ts          # Status Polling (5 tests)
+│   ├── status.e2e-spec.ts          # Status Polling (6 tests)
 │   ├── health.e2e-spec.ts          # Health Check (3 tests)
 │   └── payment-integration.e2e-spec.ts  # Payment Flow (2 tests)
 ├── fixtures/                        # 테스트 데이터
@@ -279,12 +281,12 @@ packages/relay-api/test/
 
 | 카테고리 | 테스트 파일 | 테스트 수 | 주요 검증 |
 |---------|------------|---------|---------|
-| Direct TX | direct.e2e-spec.ts | 7 | 유효성 검증, 인증, 에러 처리 |
+| Direct TX | direct.e2e-spec.ts | 8 | 유효성 검증, 인증, 에러 처리 |
 | Gasless TX | gasless.e2e-spec.ts | 10 | 서명 검증, Nonce, 에러 처리 |
-| Status | status.e2e-spec.ts | 5 | 상태 조회, 404/503 에러 |
+| Status | status.e2e-spec.ts | 6 | 상태 조회, 404/503 에러 |
 | Health | health.e2e-spec.ts | 3 | 서비스 상태, 공개 엔드포인트 |
 | Payment | payment-integration.e2e-spec.ts | 2 | 전체 플로우, 통합 시나리오 |
-| **합계** | **5 files** | **27 tests** | **종합 검증** |
+| **합계** | **5 files** | **29 tests** | **종합 검증** |
 
 ---
 
@@ -325,9 +327,9 @@ packages/relay-api/test/
 
 ### 기능 검증
 
-✅ **AC-E2E-001**: Direct Transaction API 7개 테스트 케이스 모두 통과
+✅ **AC-E2E-001**: Direct Transaction API 8개 테스트 케이스 모두 통과
 ✅ **AC-E2E-002**: Gasless Transaction API 10개 테스트 케이스 모두 통과
-✅ **AC-E2E-003**: Status Polling API 5개 테스트 케이스 모두 통과
+✅ **AC-E2E-003**: Status Polling API 6개 테스트 케이스 모두 통과
 ✅ **AC-E2E-004**: Health Check API 3개 테스트 케이스 모두 통과
 ✅ **AC-E2E-005**: Payment Integration 2개 시나리오 테스트 통과
 
@@ -371,7 +373,7 @@ packages/relay-api/test/
 
 - **파일**: 신규 11개, 수정 1개
 - **코드 라인**: ~800 LOC (테스트 포함)
-- **테스트 케이스**: 27개
+- **테스트 케이스**: 29개
 - **구현 시간**: ~4시간 (4 Phase)
 
 ---
