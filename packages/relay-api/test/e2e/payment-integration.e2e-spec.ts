@@ -30,20 +30,23 @@ describe('Payment Integration E2E Tests', () => {
         '0x2222222222222222222222222222222222222222',
       ];
 
-      // When: Submit multiple Direct TX requests
-      for (const recipient of recipients) {
-        const payload = {
-          to: recipient,
-          data: '0x00',
-          speed: 'fast',
-        };
+      // When: Submit multiple Direct TX requests in parallel
+      const responses = await Promise.all(
+        recipients.map((recipient) => {
+          const payload = {
+            to: recipient,
+            data: '0x00',
+            speed: 'fast',
+          };
+          return request(app.getHttpServer())
+            .post('/api/v1/relay/direct')
+            .set('x-api-key', 'test-api-key')
+            .send(payload);
+        }),
+      );
 
-        const response = await request(app.getHttpServer())
-          .post('/api/v1/relay/direct')
-          .set('x-api-key', 'test-api-key')
-          .send(payload);
-
-        // Then: Each request should return 202 Accepted
+      // Then: Each request should return 202 Accepted
+      for (const response of responses) {
         expect(response.status).toBe(202);
         expect(response.body).toHaveProperty('transactionId');
         transactionIds.push(response.body.transactionId);
