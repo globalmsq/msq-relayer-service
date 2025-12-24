@@ -3,10 +3,10 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from '@msq-relayer/relay-api/src/app.module';
-import { TEST_WALLETS, TEST_ADDRESSES } from '@msq-relayer/relay-api/test/fixtures/test-wallets';
-// Note: E2E signer uses static TEST_CONFIG domain, which differs from deployed contracts
+import { TEST_WALLETS, TEST_ADDRESSES } from '../src/helpers/test-wallets';
+// Note: E2E signer uses static domain configuration
 // For integration tests against real contracts, we use signForwardRequestWithDomain
-import { signForwardRequest as signForwardRequestE2E, createForwardRequest as createForwardRequestE2E } from '@msq-relayer/relay-api/test/utils/eip712-signer';
+import { signForwardRequest as signForwardRequestE2E, createForwardRequest as createForwardRequestE2E } from '../src/helpers/eip712-signer-static';
 import { signForwardRequestWithDomain, createForwardRequest } from '../src/helpers/signer';
 import {
   getNetworkConfig,
