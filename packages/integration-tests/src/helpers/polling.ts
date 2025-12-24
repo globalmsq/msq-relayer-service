@@ -86,6 +86,7 @@ export async function getTransactionStatus(transactionId: string): Promise<TxSta
 
   const response = await axios.get(`${baseUrl}/api/v1/relay/status/${transactionId}`, {
     headers: { 'x-api-key': apiKey },
+    timeout: 5000, // 5 second timeout to prevent hanging
   });
 
   return response.data;

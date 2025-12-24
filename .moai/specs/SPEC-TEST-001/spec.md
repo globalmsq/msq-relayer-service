@@ -599,7 +599,7 @@ pnpm --filter @msq-relayer/integration-tests test
 
 ## Implementation Status
 
-**Status**: ✅ **80% Complete** (코드 구현 완료, 문서화 필요)
+**Status**: ✅ **80% Complete** (Code implementation complete, documentation pending)
 
 **Completed**:
 - ✅ polling.ts (139 lines) - Transaction status polling utilities

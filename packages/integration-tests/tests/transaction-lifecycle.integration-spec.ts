@@ -312,6 +312,14 @@ describe('Transaction Lifecycle Tests', () => {
       }
     });
 
+    /**
+     * TC-TXL-201: Verify EIP-712 signature format
+     *
+     * This test validates signature generation mechanics (format, length).
+     * Contract-level signature verification is covered by TC-TXL-202, which
+     * performs a full end-to-end gasless transaction that would fail if
+     * the signature were invalid.
+     */
     it('TC-TXL-201: should verify EIP-712 signature generation', async () => {
       if (!contractsDeployed) {
         console.log('   ⏭️ Skipped: Contracts not deployed');
@@ -321,7 +329,7 @@ describe('Transaction Lifecycle Tests', () => {
       // Get current nonce from contract
       const nonce = await getForwarderNonce(contracts.forwarder, TEST_ADDRESSES.user);
 
-      // Create forward request for token transfer (using E2E signer for format testing)
+      // Create forward request for token transfer (using static signer for format testing)
       const transferData = encodeTokenTransfer(TEST_ADDRESSES.merchant, parseTokenAmount('5'));
       const forwardRequest = createForwardRequestE2E(TEST_ADDRESSES.user, contracts.sampleToken, {
         nonce: Number(nonce),
@@ -329,7 +337,8 @@ describe('Transaction Lifecycle Tests', () => {
         gas: '100000',
       });
 
-      // Sign with EIP-712 (E2E signer - tests signature format, not verification)
+      // Sign with EIP-712 (static domain - validates format, not contract verification)
+      // Full contract verification occurs in TC-TXL-202 via signForwardRequestWithDomain
       const signature = await signForwardRequestE2E(TEST_WALLETS.user, forwardRequest);
 
       // Signature should be 65 bytes (130 hex chars + 0x prefix)

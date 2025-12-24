@@ -15,7 +15,7 @@ status: "implemented"
 
 **Scope**: 3 new files, 1 modified file, ~605 lines of code
 
-**Current Status**: ✅ 80% Complete (구현 완료, 문서화 필요)
+**Current Status**: ✅ 80% Complete (Implementation complete, documentation pending)
 
 ---
 
@@ -492,5 +492,5 @@ pnpm --filter @msq-relayer/integration-tests test transaction-lifecycle
 ---
 
 **Plan Version**: 1.0.0
-**Status**: ✅ 80% Complete (구현 완료, 문서화 필요)
+**Status**: ✅ 80% Complete (Implementation complete, documentation pending)
 **Last Updated**: 2025-12-24
