@@ -1,7 +1,7 @@
 # Documentation Index
 
-**Version**: 1.0.0
-**Last Updated**: 2025-12-23
+**Version**: 1.0.1
+**Last Updated**: 2025-12-24
 **Status**: Complete
 
 This index helps you navigate MSQ Relayer Service documentation efficiently.
@@ -259,13 +259,14 @@ curl http://localhost:3000/api/docs
 | Document | Version | Last Updated | Status |
 |----------|---------|--------------|--------|
 | README.md | 12.4 | 2025-12-23 | Current |
-| product.md | 1.0 | 2025-12-23 | Current |
-| structure.md | 1.0 | 2025-12-23 | Current |
-| tech.md | 12.7 | 2025-12-23 | Current (Section 8 added) |
-| TESTING.md | 1.0 | 2025-12-23 | NEW |
+| product.md | 12.3 | 2025-12-23 | Current |
+| structure.md | 12.2 | 2025-12-22 | Current |
+| tech.md | 12.6 | 2025-12-24 | Updated (Sample contracts sync) |
+| TESTING.md | 1.1 | 2025-12-23 | Current (Transaction Lifecycle) |
 | CONTRACTS_GUIDE.md | 1.0 | 2025-12-19 | Current |
 | DOCKER_SETUP.md | 1.0 | 2025-12-19 | Current |
 | MERMAID_DIAGRAMS.md | 1.0 | 2025-12-19 | Current |
+| INDEX.md | 1.0.1 | 2025-12-24 | Updated (docs/README.md removed) |
 
 ---
 
@@ -289,6 +290,6 @@ If you find documentation that needs updates:
 ---
 
 **Documentation Index**
-- Version: 1.0.0
-- Last Updated: 2025-12-23
+- Version: 1.0.1
+- Last Updated: 2025-12-24
 - Maintained by: Manager-Docs Agent

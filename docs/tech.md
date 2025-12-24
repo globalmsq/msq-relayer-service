@@ -321,52 +321,118 @@ Domain {
 #### SampleToken.sol (ERC20 + ERC2771Context)
 
 ```solidity
-pragma solidity ^0.8.27;
+pragma solidity 0.8.27;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Pausable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
 
-contract SampleToken is ERC20, ERC2771Context {
-    constructor(address forwarder) ERC20("Sample Token", "SAMPLE") ERC2771Context(forwarder) {
-        _mint(msg.sender, 1000000 * 10 ** 18);
+contract SampleToken is ERC20, ERC20Burnable, ERC20Pausable, Ownable, ERC2771Context {
+    constructor(address forwarder)
+        ERC20("Sample Token", "SMPL")
+        Ownable(msg.sender)
+        ERC2771Context(forwarder)
+    {
+        uint256 initialSupply = 1000000 * 10 ** decimals();
+        _mint(msg.sender, initialSupply);
     }
 
-    function _msgSender() internal view override(ERC20, ERC2771Context) returns (address) {
+    // ERC2771Context overrides - CRITICAL for meta-transaction support
+    function _msgSender() internal view override(Context, ERC2771Context) returns (address) {
         return ERC2771Context._msgSender();
     }
 
-    function _contextSuffixLength() internal view override(ERC20, ERC2771Context) returns (uint256) {
+    function _msgData() internal view override(Context, ERC2771Context) returns (bytes calldata) {
+        return ERC2771Context._msgData();
+    }
+
+    function _contextSuffixLength() internal view override(Context, ERC2771Context) returns (uint256) {
         return ERC2771Context._contextSuffixLength();
     }
+
+    // ERC20Pausable override
+    function _update(address from, address to, uint256 amount) internal override(ERC20, ERC20Pausable) {
+        super._update(from, to, amount);
+    }
+
+    // Owner functions
+    function pause() public onlyOwner { _pause(); }
+    function unpause() public onlyOwner { _unpause(); }
+    function mint(address to, uint256 amount) public onlyOwner { _mint(to, amount); }
 }
 ```
 
 **Purpose**: Demonstrates gasless token transfer pattern with meta-transaction support.
 
+**Key Implementation Notes**:
+- Overrides must specify `Context` (not `ERC20`) and `ERC2771Context` for proper diamond inheritance
+- `_msgData()` override is required in addition to `_msgSender()` for complete ERC2771 support
+- The contract includes ERC20Burnable, ERC20Pausable, and Ownable for production-ready features
+
 #### SampleNFT.sol (ERC721 + ERC2771Context)
 
 ```solidity
-pragma solidity ^0.8.27;
+pragma solidity 0.8.27;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
 
-contract SampleNFT is ERC721, ERC2771Context {
-    constructor(address forwarder) ERC721("Sample NFT", "SAMPLE") ERC2771Context(forwarder) {
-        // Constructor implementation
+contract SampleNFT is ERC721, ERC721Burnable, ERC721Enumerable, Ownable, ERC2771Context {
+    uint256 private _nextTokenId;
+
+    constructor(address forwarder)
+        ERC721("Sample NFT", "SNFT")
+        Ownable(msg.sender)
+        ERC2771Context(forwarder)
+    {
+        _nextTokenId = 1;
     }
 
-    function _msgSender() internal view override(ERC721, ERC2771Context) returns (address) {
+    function mint(address to) public onlyOwner returns (uint256) {
+        uint256 tokenId = _nextTokenId++;
+        _safeMint(to, tokenId);
+        return tokenId;
+    }
+
+    // ERC2771Context overrides
+    function _msgSender() internal view override(Context, ERC2771Context) returns (address) {
         return ERC2771Context._msgSender();
     }
 
-    function _contextSuffixLength() internal view override(ERC721, ERC2771Context) returns (uint256) {
+    function _msgData() internal view override(Context, ERC2771Context) returns (bytes calldata) {
+        return ERC2771Context._msgData();
+    }
+
+    function _contextSuffixLength() internal view override(Context, ERC2771Context) returns (uint256) {
         return ERC2771Context._contextSuffixLength();
+    }
+
+    // ERC721Enumerable overrides
+    function _update(address to, uint256 tokenId, address auth)
+        internal override(ERC721, ERC721Enumerable) returns (address) {
+        return super._update(to, tokenId, auth);
+    }
+
+    function _increaseBalance(address account, uint128 amount)
+        internal override(ERC721, ERC721Enumerable) {
+        super._increaseBalance(account, amount);
+    }
+
+    function supportsInterface(bytes4 interfaceId)
+        public view override(ERC721, ERC721Enumerable) returns (bool) {
+        return super.supportsInterface(interfaceId);
     }
 }
 ```
 
 **Purpose**: Demonstrates gasless NFT minting pattern with meta-transaction support.
+
+**Note**: The current implementation returns `msg.sender` directly instead of `ERC2771Context._msgSender()` for testing purposes. Production implementations should delegate to ERC2771Context for proper meta-transaction support.
 
 ### 4.6 Deployment Script: deploy-forwarder.ts
 
