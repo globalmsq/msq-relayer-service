@@ -321,47 +321,111 @@ Domain {
 #### SampleToken.sol (ERC20 + ERC2771Context)
 
 ```solidity
-pragma solidity ^0.8.27;
+pragma solidity 0.8.27;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Pausable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
 
-contract SampleToken is ERC20, ERC2771Context {
-    constructor(address forwarder) ERC20("Sample Token", "SAMPLE") ERC2771Context(forwarder) {
-        _mint(msg.sender, 1000000 * 10 ** 18);
+contract SampleToken is ERC20, ERC20Burnable, ERC20Pausable, Ownable, ERC2771Context {
+    constructor(address forwarder)
+        ERC20("Sample Token", "SMPL")
+        Ownable(msg.sender)
+        ERC2771Context(forwarder)
+    {
+        uint256 initialSupply = 1000000 * 10 ** decimals();
+        _mint(msg.sender, initialSupply);
     }
 
-    function _msgSender() internal view override(ERC20, ERC2771Context) returns (address) {
+    // ERC2771Context overrides - CRITICAL for meta-transaction support
+    function _msgSender() internal view override(Context, ERC2771Context) returns (address) {
         return ERC2771Context._msgSender();
     }
 
-    function _contextSuffixLength() internal view override(ERC20, ERC2771Context) returns (uint256) {
+    function _msgData() internal view override(Context, ERC2771Context) returns (bytes calldata) {
+        return ERC2771Context._msgData();
+    }
+
+    function _contextSuffixLength() internal view override(Context, ERC2771Context) returns (uint256) {
         return ERC2771Context._contextSuffixLength();
     }
+
+    // ERC20Pausable override
+    function _update(address from, address to, uint256 amount) internal override(ERC20, ERC20Pausable) {
+        super._update(from, to, amount);
+    }
+
+    // Owner functions
+    function pause() public onlyOwner { _pause(); }
+    function unpause() public onlyOwner { _unpause(); }
+    function mint(address to, uint256 amount) public onlyOwner { _mint(to, amount); }
 }
 ```
 
 **Purpose**: Demonstrates gasless token transfer pattern with meta-transaction support.
 
+**Key Implementation Notes**:
+- Overrides must specify `Context` (not `ERC20`) and `ERC2771Context` for proper diamond inheritance
+- `_msgData()` override is required in addition to `_msgSender()` for complete ERC2771 support
+- The contract includes ERC20Burnable, ERC20Pausable, and Ownable for production-ready features
+
 #### SampleNFT.sol (ERC721 + ERC2771Context)
 
 ```solidity
-pragma solidity ^0.8.27;
+pragma solidity 0.8.27;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
 
-contract SampleNFT is ERC721, ERC2771Context {
-    constructor(address forwarder) ERC721("Sample NFT", "SAMPLE") ERC2771Context(forwarder) {
-        // Constructor implementation
+contract SampleNFT is ERC721, ERC721Burnable, ERC721Enumerable, Ownable, ERC2771Context {
+    uint256 private _nextTokenId;
+
+    constructor(address forwarder)
+        ERC721("Sample NFT", "SNFT")
+        Ownable(msg.sender)
+        ERC2771Context(forwarder)
+    {
+        _nextTokenId = 1;
     }
 
-    function _msgSender() internal view override(ERC721, ERC2771Context) returns (address) {
+    function mint(address to) public onlyOwner returns (uint256) {
+        uint256 tokenId = _nextTokenId++;
+        _safeMint(to, tokenId);
+        return tokenId;
+    }
+
+    // ERC2771Context overrides
+    function _msgSender() internal view override(Context, ERC2771Context) returns (address) {
         return ERC2771Context._msgSender();
     }
 
-    function _contextSuffixLength() internal view override(ERC721, ERC2771Context) returns (uint256) {
+    function _msgData() internal view override(Context, ERC2771Context) returns (bytes calldata) {
+        return ERC2771Context._msgData();
+    }
+
+    function _contextSuffixLength() internal view override(Context, ERC2771Context) returns (uint256) {
         return ERC2771Context._contextSuffixLength();
+    }
+
+    // ERC721Enumerable overrides
+    function _update(address to, uint256 tokenId, address auth)
+        internal override(ERC721, ERC721Enumerable) returns (address) {
+        return super._update(to, tokenId, auth);
+    }
+
+    function _increaseBalance(address account, uint128 amount)
+        internal override(ERC721, ERC721Enumerable) {
+        super._increaseBalance(account, amount);
+    }
+
+    function supportsInterface(bytes4 interfaceId)
+        public view override(ERC721, ERC721Enumerable) returns (bool) {
+        return super.supportsInterface(interfaceId);
     }
 }
 ```
@@ -2695,6 +2759,63 @@ E2E tests use Jest Spy to mock OZ Relayer HTTP responses (no actual blockchain c
 | [SPEC-E2E-001](../.moai/specs/SPEC-E2E-001/spec.md) | E2E Test Infrastructure Specification |
 | [SPEC-E2E-001 Acceptance](../.moai/specs/SPEC-E2E-001/acceptance.md) | Acceptance Criteria and Test Scenarios |
 | [docs/TESTING.md](./TESTING.md) | Comprehensive Testing Guide |
+
+### 8.9 Transaction Lifecycle Tests (SPEC-TEST-001)
+
+Real blockchain transaction verification tests that execute actual transactions through the complete flow.
+
+#### 8.9.1 Architecture
+
+```
+API Gateway → OZ Relayer Pool → Hardhat Node
+     ↓              ↓              ↓
+  Submit TX    Relay to Chain   Mine Block
+     ↓              ↓              ↓
+  Poll Status   Return Hash    Confirm TX
+```
+
+#### 8.9.2 Key Components
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| Polling | `packages/integration-tests/src/helpers/polling.ts` | Exponential backoff with HARDHAT_POLLING_CONFIG |
+| Contracts | `packages/integration-tests/src/helpers/contracts.ts` | ABI definitions, verification utilities |
+| Tests | `packages/integration-tests/tests/transaction-lifecycle.integration-spec.ts` | 9 test cases |
+
+#### 8.9.3 Test Categories
+
+| Category | Test IDs | Description |
+|----------|----------|-------------|
+| Contract Verification | TC-TXL-001~004 | Deployment and configuration checks |
+| Direct Transaction | TC-TXL-100~101 | Standard TX lifecycle |
+| Gasless Transaction | TC-TXL-200~202 | EIP-712 meta-transaction flow |
+
+#### 8.9.4 Environment Variables
+
+```env
+FORWARDER_ADDRESS=0x5FbDB2315678afecb367f032d93F642f64180aa3
+SAMPLE_TOKEN_ADDRESS=0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512
+SAMPLE_NFT_ADDRESS=0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0
+```
+
+#### 8.9.5 Execution
+
+```bash
+# Prerequisites: Docker Compose stack running
+docker compose -f docker/docker-compose.yaml up -d
+
+# Run lifecycle tests only
+pnpm --filter @msq-relayer/integration-tests test:lifecycle
+```
+
+#### 8.9.6 Difference from E2E Tests
+
+| Aspect | E2E Tests (SPEC-E2E-001) | Lifecycle Tests (SPEC-TEST-001) |
+|--------|--------------------------|----------------------------------|
+| Blockchain | Mock | Real (Hardhat) |
+| OZ Relayer | Mock | Real |
+| Transaction | Simulated | Actually mined |
+| Purpose | API validation | Transaction verification |
 
 ---
 
