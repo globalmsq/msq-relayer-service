@@ -56,7 +56,7 @@ contract SampleNFT is
     /**
      * @dev Override required for ERC2771Context compatibility.
      * Returns the sender of the transaction.
-     * Always returns msg.sender since we don't use ERC2771 forwarder in tests.
+     * When called through trusted forwarder, extracts original sender from calldata.
      */
     function _msgSender()
         internal
@@ -64,13 +64,13 @@ contract SampleNFT is
         override(Context, ERC2771Context)
         returns (address)
     {
-        return msg.sender;
+        return ERC2771Context._msgSender();
     }
 
     /**
      * @dev Override required for ERC2771Context compatibility.
      * Returns the calldata.
-     * Always returns msg.data since we don't use ERC2771 forwarder in tests.
+     * When called through trusted forwarder, strips the sender suffix.
      */
     function _msgData()
         internal
@@ -78,13 +78,12 @@ contract SampleNFT is
         override(Context, ERC2771Context)
         returns (bytes calldata)
     {
-        return msg.data;
+        return ERC2771Context._msgData();
     }
 
     /**
      * @dev Override required for ERC2771Context compatibility.
-     * Returns the length of the meta-transaction suffix.
-     * Always returns 0 since we don't use ERC2771 forwarder in tests.
+     * Returns the length of the meta-transaction suffix (20 bytes for address).
      */
     function _contextSuffixLength()
         internal
@@ -92,7 +91,7 @@ contract SampleNFT is
         override(Context, ERC2771Context)
         returns (uint256)
     {
-        return 0;
+        return ERC2771Context._contextSuffixLength();
     }
 
     /**

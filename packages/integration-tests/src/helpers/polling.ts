@@ -39,19 +39,18 @@ export const DEFAULT_POLLING_CONFIG: PollingConfig = {
 
 /**
  * Optimized polling config for Hardhat local network
- * OZ Relayer needs time to submit and mine transactions:
- * - Submit to blockchain: ~1 second
- * - Wait for block mining: ~2 seconds (average_blocktime_ms: 2000)
- * - Status update: ~1 second
- * Total: ~4-5 seconds minimum per transaction
+ * Configured per SPEC-TEST-001 acceptance criteria for fast test execution:
+ * - maxAttempts: 10 (reduced from 20)
+ * - initialDelayMs: 200ms (reduced from 500ms)
+ * - backoffMultiplier: 1.2 (reduced from 1.3)
  *
- * Config: 20 attempts × 500ms average = ~10 seconds total polling time
+ * Expected confirmation time: ~2-3 seconds on Hardhat
  */
 export const HARDHAT_POLLING_CONFIG: PollingConfig = {
-  maxAttempts: 20,
-  initialDelayMs: 500,
+  maxAttempts: 10,
+  initialDelayMs: 200,
   maxDelayMs: 2000,
-  backoffMultiplier: 1.3,
+  backoffMultiplier: 1.2,
   terminalStatuses: ['confirmed', 'mined', 'failed', 'reverted'],
 };
 

@@ -432,8 +432,6 @@ contract SampleNFT is ERC721, ERC721Burnable, ERC721Enumerable, Ownable, ERC2771
 
 **Purpose**: Demonstrates gasless NFT minting pattern with meta-transaction support.
 
-**Note**: The current implementation returns `msg.sender` directly instead of `ERC2771Context._msgSender()` for testing purposes. Production implementations should delegate to ERC2771Context for proper meta-transaction support.
-
 ### 4.6 Deployment Script: deploy-forwarder.ts
 
 **Network Detection Logic**:
