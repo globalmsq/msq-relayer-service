@@ -175,7 +175,7 @@ MSQ Relayer Service의 API 문서화 및 운영을 위한 통합 SPEC입니다. 
 - OpenAPI 3.0 스펙 준수
 
 **Docker 제약사항:**
-- docker-compose.prod.yml은 SPEC-INFRA-001과 일관된 구조 유지
+- 로컬 개발 환경은 docker-compose.yaml 사용 (SPEC-INFRA-001)
 - Named Volume 전략 유지 (`msq-relayer-` 접두사)
 
 ### 보안 제약사항

@@ -63,7 +63,7 @@ curl -I http://localhost:3000/api/docs
 
 ### When (실행 동작)
 1. `http://localhost:3000/api/docs-json` 접근
-2. 또는 Makefile 타겟 실행: `make api-docs`
+2. 또는 curl로 직접 다운로드: `curl http://localhost:3000/api/docs-json > openapi.json`
 
 ### Then (예상 결과)
 1. **OpenAPI JSON이 다운로드됨**

@@ -289,28 +289,24 @@ RPC_URL=http://localhost:8545
 
 **서비스 시작:**
 ```bash
-# 프로덕션 환경 시작
-make prod-up
+# 개발 환경 시작
+cd packages/relay-api
+pnpm run start:dev
 
-# 또는
-cd docker
-docker-compose -f docker-compose.prod.yml up -d
+# 또는 Docker 개발 환경
+docker compose -f docker/docker-compose.yaml up -d
 ```
 
 **서비스 중지:**
 ```bash
-# 프로덕션 환경 중지
-make prod-down
-
-# 또는
-cd docker
-docker-compose -f docker-compose.prod.yml down
+# Docker 개발 환경 중지
+docker compose -f docker/docker-compose.yaml down
 ```
 
 **서비스 상태 확인:**
 ```bash
 # Health Check
-make health-check
+curl http://localhost:3000/api/v1/health
 
 # 또는
 curl http://localhost:3001/api/v1/health
