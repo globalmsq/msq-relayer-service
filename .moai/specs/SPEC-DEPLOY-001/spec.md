@@ -12,17 +12,17 @@ priority: "medium"
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
+| 2.0.0 | 2024-12-25 | @user | 사용자 피드백 반영: Makefile 및 docker-compose.prod.yml 제거, Swagger/OpenAPI와 운영 가이드 중심으로 재편성 |
 | 1.0.0 | 2024-12-25 | @user | Task #12 기반 초기 SPEC 생성 - 프로덕션 환경 설정, API 문서화, 운영 가이드 |
 
-# SPEC-DEPLOY-001: 프로덕션 배포 환경 설정, API 문서화 및 운영 가이드
+# SPEC-DEPLOY-001: API 문서화 및 운영 가이드
 
 ## 개요
 
-MSQ Relayer Service의 프로덕션 준비(Production Readiness)를 위한 통합 배포 환경 설정 및 운영 문서화 SPEC입니다. 이 SPEC은 Task #12의 요구사항을 기반으로 다음 세 가지 핵심 영역을 다룹니다:
+MSQ Relayer Service의 API 문서화 및 운영을 위한 통합 SPEC입니다. 이 SPEC은 Task #12의 요구사항을 기반으로 다음 두 가지 핵심 영역을 다룹니다:
 
-1. **프로덕션 배포 환경**: docker-compose.prod.yml 기반 2-replica 배포 설정
-2. **API 문서화**: Swagger/OpenAPI 기반 자동 문서 생성 및 Client SDK 지원
-3. **운영 가이드**: 서비스 운영 절차, 모니터링, 트러블슈팅 문서
+1. **API 문서화**: Swagger/OpenAPI 3.0 기반 자동 문서 생성 및 Client SDK 지원
+2. **운영 가이드**: 개발/운영 환경 설정, 서비스 관리 절차, 모니터링, 트러블슈팅
 
 **배경:**
 - 기존 SPEC-INFRA-001에서 로컬 개발 환경(docker-compose.yaml) 구축 완료
@@ -46,21 +46,17 @@ MSQ Relayer Service의 프로덕션 준비(Production Readiness)를 위한 통�
 - 모든 HTTP 응답에 `@ApiResponse` 데코레이터 필수
 - 모든 DTO에 `@ApiProperty` 및 예제 값 필수
 
-**U-DEPLOY-002**: 시스템은 프로덕션 환경에서 docker-compose.prod.yml을 사용해야 합니다.
-- 로컬 개발: docker-compose.yaml (SPEC-INFRA-001)
-- 프로덕션: docker-compose.prod.yml (이 SPEC)
-
-**U-DEPLOY-003**: 시스템은 환경별 설정을 `.env.{environment}` 파일 형식으로 관리해야 합니다.
+**U-DEPLOY-002**: 시스템은 환경별 설정을 `.env.{environment}` 파일 형식으로 관리해야 합니다.
 - `.env.development`: 로컬 개발 환경
 - `.env.staging`: 스테이징 환경
 - `.env.production`: 프로덕션 환경
 - `.env.example`: 템플릿 (Git 포함)
 
-**U-DEPLOY-004**: 시스템은 API 문서에 API Key 인증 방식을 명시해야 합니다.
+**U-DEPLOY-003**: 시스템은 API 문서에 API Key 인증 방식을 명시해야 합니다.
 - Swagger UI에서 API Key 입력 UI 제공
 - `x-api-key` 헤더 사용 방식 문서화
 
-**U-DEPLOY-005**: 시스템은 모든 환경 설정 파일에서 민감 정보를 제외하고 `.env.example`만 Git에 포함해야 합니다.
+**U-DEPLOY-004**: 시스템은 모든 환경 설정 파일에서 민감 정보를 제외하고 `.env.example`만 Git에 포함해야 합니다.
 - `.env.development`, `.env.staging`, `.env.production`은 `.gitignore` 추가
 
 ### Event-driven Requirements (이벤트 기반 요구사항)
@@ -73,35 +69,15 @@ MSQ Relayer Service의 프로덕션 준비(Production Readiness)를 위한 통�
 - Content-Type: `application/json`
 - 스키마 검증 통과 필수
 
-**E-DEPLOY-003**: 프로덕션 배포 시작 시, 시스템은 환경 변수 검증을 수행한 후 서비스를 시작해야 합니다.
+**E-DEPLOY-003**: 서비스 시작 시, 시스템은 환경 변수 검증을 수행한 후 서비스를 시작해야 합니다.
 - 필수 환경 변수 누락 시 에러 로그 출력 및 종료
-- 검증 통과 후 relay-api 2개 replica 시작
-
-**E-DEPLOY-004**: Health Check 실패 시, Docker Compose는 자동으로 컨테이너를 재시작해야 합니다.
-- `healthcheck` 지시자 설정
-- 3회 연속 실패 시 재시작
-
-**E-DEPLOY-005**: Makefile 타겟 실행 시, 시스템은 해당 작업을 수행하고 결과를 출력해야 합니다.
-- `make prod-up`: 프로덕션 환경 시작
-- `make prod-down`: 프로덕션 환경 종료
-- `make api-docs`: OpenAPI JSON 추출
-- `make health-check`: 전체 서비스 상태 확인
+- 검증 통과 후 서비스 시작
 
 ### State-driven Requirements (상태 기반 요구사항)
 
-**S-DEPLOY-001**: 프로덕션 모드에서 실행 중일 때, 시스템은 리소스 제한(CPU/Memory)을 적용해야 합니다.
-- relay-api: CPU 1.0 core, Memory 512MB
-- OZ Relayer: CPU 0.5 core, Memory 256MB
-- Redis: CPU 0.3 core, Memory 128MB
-
-**S-DEPLOY-002**: Health Check가 실패 상태일 때, 시스템은 자동 복구를 시도해야 합니다.
-- 3회 연속 실패 시 컨테이너 재시작
-- 재시작 후 30초 start_period 적용
-
-**S-DEPLOY-003**: 프로덕션 환경에서 실행 중일 때, 시스템은 로그 로테이션을 적용해야 합니다.
-- `logging` 지시자 설정
-- 최대 로그 크기: 10MB
-- 최대 로그 파일 수: 3개
+**S-DEPLOY-001**: API 문서화가 완료되어 실행 중일 때, 시스템은 최신 문서를 제공해야 합니다.
+- Swagger UI와 OpenAPI JSON이 일관된 정보 유지
+- 코드 변경 시 문서 자동 반영
 
 ### Unwanted Behavior (금지된 동작)
 
@@ -143,29 +119,6 @@ MSQ Relayer Service의 프로덕션 준비(Production Readiness)를 위한 통�
 - Swagger UI: `http://localhost:3000/api/docs`
 - OpenAPI JSON: `http://localhost:3000/api/docs-json`
 
-### Docker Compose 프로덕션 설정
-
-**파일:**
-- `docker/docker-compose.prod.yml`: 프로덕션 환경 설정
-
-**서비스 구성:**
-- `relay-api-1`: replica 1 (포트 3001)
-- `relay-api-2`: replica 2 (포트 3002)
-- `oz-relayer-1`, `oz-relayer-2`, `oz-relayer-3`: 기존 설정 유지
-- `redis`: 기존 설정 유지
-
-**리소스 제한:**
-```yaml
-deploy:
-  resources:
-    limits:
-      cpus: '1.0'
-      memory: 512M
-    reservations:
-      cpus: '0.5'
-      memory: 256M
-```
-
 ### 환경별 설정 파일
 
 **파일 구조:**
@@ -183,17 +136,6 @@ deploy:
 - `REDIS_HOST`: Redis 호스트
 - `REDIS_PORT`: Redis 포트
 - `RPC_URL`: 블록체인 RPC URL
-
-### Makefile 타겟
-
-**위치:** 프로젝트 루트에 `Makefile` 생성
-
-**주요 타겟:**
-- `prod-up`: 프로덕션 환경 시작
-- `prod-down`: 프로덕션 환경 종료
-- `api-docs`: OpenAPI JSON 추출
-- `health-check`: 서비스 상태 확인
-- `generate-client`: TypeScript Client SDK 생성 (선택 사항)
 
 ---
 
@@ -248,10 +190,6 @@ deploy:
 
 ### 파일 위치 제약사항
 
-**Docker 파일:**
-- `docker/docker-compose.prod.yml`: 프로덕션 설정
-- `docker/Dockerfile.packages`: 기존 파일 재사용
-
 **환경 파일:**
 - 프로젝트 루트에 `.env.*` 파일 배치
 
@@ -299,7 +237,7 @@ deploy:
 - 운영 가이드(`docs/operations.md`)에 절차 명시
 
 **운영 절차:**
-- Makefile을 통한 표준화된 배포 절차
+- 환경별 설정 파일로 표준화된 배포 절차 구현
 - 신규 인력 온보딩 시 `docs/operations.md` 참조
 
 ---
@@ -312,10 +250,8 @@ deploy:
 
 **Subtasks (예상):**
 - `12.1`: Swagger/OpenAPI 통합 및 모든 엔드포인트 문서화
-- `12.2`: docker-compose.prod.yml 작성 및 2-replica 배포 설정
-- `12.3`: 환경별 설정 파일 생성 (.env.development, .env.staging, .env.production)
-- `12.4`: Deployment Makefile 작성
-- `12.5`: 운영 가이드 작성 (docs/operations.md)
+- `12.2`: 환경별 설정 파일 생성 (.env.development, .env.staging, .env.production)
+- `12.3`: 운영 가이드 작성 (docs/operations.md)
 
 ### PRD 참조
 
@@ -341,52 +277,35 @@ deploy:
 ## 완료 체크리스트
 
 ### Swagger/OpenAPI 통합
-- [ ] main.ts에 SwaggerModule 설정 추가
-- [ ] 모든 컨트롤러에 @ApiOperation, @ApiResponse 추가
-- [ ] 모든 DTO에 @ApiProperty 및 예제 값 추가
-- [ ] /api/docs 및 /api/docs-json 엔드포인트 검증
-- [ ] API Key 인증 방식 문서화
-
-### 프로덕션 Docker Compose
-- [ ] docker-compose.prod.yml 작성
-- [ ] relay-api 2 replica 설정 (포트 3001, 3002)
-- [ ] 리소스 제한 설정 (CPU, Memory)
-- [ ] Health Check 및 자동 재시작 설정
-- [ ] 로그 로테이션 설정
+- [x] main.ts에 SwaggerModule 설정 추가
+- [x] 모든 컨트롤러에 @ApiOperation, @ApiResponse 추가
+- [x] 모든 DTO에 @ApiProperty 및 예제 값 추가
+- [x] /api/docs 및 /api/docs-json 엔드포인트 검증
+- [x] API Key 인증 방식 문서화
 
 ### 환경별 설정 파일
-- [ ] .env.development 작성
-- [ ] .env.staging 작성
-- [ ] .env.production 작성
-- [ ] .env.example 작성 및 Git 포함
-- [ ] .gitignore에 환경 파일 추가
-
-### Deployment Makefile
-- [ ] Makefile 생성
-- [ ] make prod-up 타겟 작성
-- [ ] make prod-down 타겟 작성
-- [ ] make api-docs 타겟 작성
-- [ ] make health-check 타겟 작성
+- [x] .env.development 작성
+- [x] .env.staging 작성
+- [x] .env.production 작성
+- [x] .env.example 작성 및 Git 포함
+- [x] .gitignore에 환경 파일 추가
 
 ### 운영 가이드
-- [ ] docs/operations.md 생성
-- [ ] 서비스 시작/중지 절차 작성
-- [ ] API 문서 접근 방법 작성
-- [ ] Client SDK 생성 가이드 작성
-- [ ] 모니터링 및 트러블슈팅 가이드 작성
+- [x] docs/operations.md 생성
+- [x] 서비스 시작/중지 절차 작성
+- [x] API 문서 접근 방법 작성
+- [x] Client SDK 생성 가이드 작성
+- [x] 모니터링 및 트러블슈팅 가이드 작성
 
 ### 검증
-- [ ] Swagger UI(/api/docs) 접근 및 API 문서 확인
-- [ ] OpenAPI JSON(/api/docs-json) 다운로드 및 스키마 검증
-- [ ] 프로덕션 Docker Compose 로컬 테스트
-- [ ] Health Check 및 자동 재시작 검증
-- [ ] Makefile 타겟 실행 테스트
+- [x] Swagger UI(/api/docs) 접근 및 API 문서 확인
+- [x] OpenAPI JSON(/api/docs-json) 다운로드 및 스키마 검증
 
 ---
 
 ## 버전 정보
 
-- **SPEC Version**: 1.0.0
+- **SPEC Version**: 2.0.0
 - **Created**: 2024-12-25
 - **Last Updated**: 2024-12-25
 - **Status**: Draft

@@ -2,20 +2,17 @@
 
 ## 개요
 
-이 문서는 SPEC-DEPLOY-001(프로덕션 배포 환경 설정, API 문서화 및 운영 가이드)의 구체적인 구현 계획을 정의합니다.
+이 문서는 SPEC-DEPLOY-001(API 문서화 및 운영 가이드)의 구체적인 구현 계획을 정의합니다.
 
 **목표:**
 - Swagger/OpenAPI 기반 자동 API 문서 생성
-- 프로덕션 환경 2-replica 배포 설정
-- 환경별 설정 파일 및 Makefile 구성
+- 환경별 설정 파일 구성
 - 운영 가이드 작성
 
 **구현 순서:**
-1. Swagger/OpenAPI 통합 (우선순위: High)
-2. Production Docker Compose (우선순위: High)
-3. 환경별 설정 파일 (우선순위: Medium)
-4. Deployment Makefile (우선순위: Medium)
-5. Operations Guide (우선순위: Medium)
+1. Swagger/OpenAPI 통합 (우선순위: High) - ✅ 완료
+2. 환경별 설정 파일 (우선순위: Medium) - ✅ 완료
+3. Operations Guide (우선순위: Medium) - ✅ 완료
 
 ---
 
@@ -212,244 +209,9 @@ export class RelayController {
 
 ---
 
-## Phase 2: Production Docker Compose (우선순위: High)
+## Phase 2: 환경별 설정 파일 (우선순위: Medium)
 
-### 2.1 docker-compose.prod.yml 작성
-
-**파일 위치:**
-- `docker/docker-compose.prod.yml`
-
-**서비스 구성:**
-```yaml
-version: '3.9'
-
-services:
-  relay-api-1:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.packages
-      target: relay-api
-    container_name: msq-relay-api-1
-    ports:
-      - "3001:3000"
-    environment:
-      - NODE_ENV=production
-      - PORT=3000
-      - RELAY_API_KEY=${RELAY_API_KEY}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - RPC_URL=${RPC_URL}
-    depends_on:
-      - redis
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/v1/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 512M
-        reservations:
-          cpus: '0.5'
-          memory: 256M
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    networks:
-      - msq-relayer-network
-
-  relay-api-2:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.packages
-      target: relay-api
-    container_name: msq-relay-api-2
-    ports:
-      - "3002:3000"
-    environment:
-      - NODE_ENV=production
-      - PORT=3000
-      - RELAY_API_KEY=${RELAY_API_KEY}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - RPC_URL=${RPC_URL}
-    depends_on:
-      - redis
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/v1/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 512M
-        reservations:
-          cpus: '0.5'
-          memory: 256M
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    networks:
-      - msq-relayer-network
-
-  redis:
-    image: redis:8.0-alpine
-    container_name: msq-redis-prod
-    ports:
-      - "6379:6379"
-    volumes:
-      - msq-relayer-redis-data:/data
-    command: redis-server --appendonly yes
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-    deploy:
-      resources:
-        limits:
-          cpus: '0.3'
-          memory: 128M
-    networks:
-      - msq-relayer-network
-
-  oz-relayer-1:
-    image: ghcr.io/openzeppelin/openzeppelin-relayer:v1.3.0
-    container_name: msq-oz-relayer-1-prod
-    volumes:
-      - ./keys/relayer-1:/app/config/keys/relayer-1:ro
-      - ./config/oz-relayer/relayer-1.json:/app/config/config.json:ro
-    environment:
-      - RUST_LOG=info
-      - RELAY_API_KEY=${RELAY_API_KEY}
-      - KEYSTORE_PASSPHRASE=${KEYSTORE_PASSPHRASE}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - RPC_URL=${RPC_URL}
-    depends_on:
-      - redis
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 256M
-    networks:
-      - msq-relayer-network
-
-  oz-relayer-2:
-    image: ghcr.io/openzeppelin/openzeppelin-relayer:v1.3.0
-    container_name: msq-oz-relayer-2-prod
-    volumes:
-      - ./keys/relayer-2:/app/config/keys/relayer-2:ro
-      - ./config/oz-relayer/relayer-2.json:/app/config/config.json:ro
-    environment:
-      - RUST_LOG=info
-      - RELAY_API_KEY=${RELAY_API_KEY}
-      - KEYSTORE_PASSPHRASE=${KEYSTORE_PASSPHRASE}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - RPC_URL=${RPC_URL}
-    depends_on:
-      - redis
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 256M
-    networks:
-      - msq-relayer-network
-
-  oz-relayer-3:
-    image: ghcr.io/openzeppelin/openzeppelin-relayer:v1.3.0
-    container_name: msq-oz-relayer-3-prod
-    volumes:
-      - ./keys/relayer-3:/app/config/keys/relayer-3:ro
-      - ./config/oz-relayer/relayer-3.json:/app/config/config.json:ro
-    environment:
-      - RUST_LOG=info
-      - RELAY_API_KEY=${RELAY_API_KEY}
-      - KEYSTORE_PASSPHRASE=${KEYSTORE_PASSPHRASE}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - RPC_URL=${RPC_URL}
-    depends_on:
-      - redis
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 256M
-    networks:
-      - msq-relayer-network
-
-volumes:
-  msq-relayer-redis-data:
-    driver: local
-
-networks:
-  msq-relayer-network:
-    driver: bridge
-```
-
-**검증:**
-- 프로덕션 환경 시작: `docker-compose -f docker/docker-compose.prod.yml up -d`
-- relay-api-1, relay-api-2 모두 시작 확인
-- Health Check 통과 확인
-
----
-
-### 2.2 프로덕션 최적화
-
-**환경 변수 검증:**
-- 필수 환경 변수 누락 시 에러 로그 출력 및 종료
-- `main.ts`에 검증 로직 추가
-
-**로그 로테이션:**
-- `logging` 지시자 설정
-- 최대 로그 크기: 10MB
-- 최대 로그 파일 수: 3개
-
-**보안 설정:**
-- 프로덕션 환경에서 개발 모드 환경 변수 사용 금지
-- Swagger UI 접근 제한 (내부 네트워크만)
-
-**검증:**
-- 환경 변수 누락 시 서비스 시작 실패 확인
-- 로그 파일 크기 및 개수 제한 동작 확인
-
----
-
-## Phase 3: 환경별 설정 파일 (우선순위: Medium)
-
-### 3.1 환경 파일 생성
+### 2.1 환경 파일 생성
 
 **파일 목록:**
 - `.env.development`
@@ -514,66 +276,9 @@ RPC_URL=http://localhost:8545
 
 ---
 
-## Phase 4: Deployment Makefile (우선순위: Medium)
+## Phase 3: Operations Guide (우선순위: Medium)
 
-### 4.1 Makefile 타겟 정의
-
-**파일 위치:**
-- 프로젝트 루트에 `Makefile` 생성
-
-**Makefile 내용:**
-```makefile
-.PHONY: prod-up prod-down api-docs health-check generate-client
-
-# 프로덕션 환경 시작
-prod-up:
-	@echo "Starting production environment..."
-	cd docker && docker-compose -f docker-compose.prod.yml up -d
-	@echo "Production environment started."
-	@echo "Swagger UI: http://localhost:3001/api/docs"
-	@echo "Swagger UI: http://localhost:3002/api/docs"
-
-# 프로덕션 환경 종료
-prod-down:
-	@echo "Stopping production environment..."
-	cd docker && docker-compose -f docker-compose.prod.yml down
-	@echo "Production environment stopped."
-
-# OpenAPI JSON 추출
-api-docs:
-	@echo "Extracting OpenAPI JSON..."
-	curl -o openapi.json http://localhost:3001/api/docs-json
-	@echo "OpenAPI JSON saved to openapi.json"
-
-# 서비스 상태 확인
-health-check:
-	@echo "Checking service health..."
-	@echo "relay-api-1:"
-	@curl -s http://localhost:3001/api/v1/health | jq || echo "Failed"
-	@echo "relay-api-2:"
-	@curl -s http://localhost:3002/api/v1/health | jq || echo "Failed"
-
-# TypeScript Client SDK 생성 (선택 사항)
-generate-client:
-	@echo "Generating TypeScript Client SDK..."
-	npx @openapitools/openapi-generator-cli generate \
-		-i openapi.json \
-		-g typescript-axios \
-		-o ./generated/client
-	@echo "Client SDK generated in ./generated/client"
-```
-
-**검증:**
-- `make prod-up` 실행 및 서비스 시작 확인
-- `make prod-down` 실행 및 서비스 종료 확인
-- `make api-docs` 실행 및 `openapi.json` 생성 확인
-- `make health-check` 실행 및 상태 출력 확인
-
----
-
-## Phase 5: Operations Guide (우선순위: Medium)
-
-### 5.1 docs/operations.md 작성
+### 3.1 docs/operations.md 작성
 
 **파일 위치:**
 - `docs/operations.md`
@@ -711,15 +416,11 @@ docker logs -f msq-relay-api-1
 
 ## 구현 우선순위 요약
 
-| Phase | 우선순위 | 예상 시간 | 의존성 |
-|-------|---------|----------|--------|
-| Phase 1: Swagger/OpenAPI 통합 | High | 2-3시간 | None |
-| Phase 2: Production Docker Compose | High | 2-3시간 | SPEC-INFRA-001 |
-| Phase 3: 환경별 설정 파일 | Medium | 1시간 | None |
-| Phase 4: Deployment Makefile | Medium | 1시간 | Phase 2 |
-| Phase 5: Operations Guide | Medium | 2시간 | Phase 1, 2, 4 |
-
-**총 예상 시간:** 8-10시간
+| Phase | 우선순위 | 상태 |
+|-------|---------|------|
+| Phase 1: Swagger/OpenAPI 통합 | High | ✅ 완료 |
+| Phase 2: 환경별 설정 파일 | Medium | ✅ 완료 |
+| Phase 3: Operations Guide | Medium | ✅ 완료 |
 
 ---
 
@@ -733,21 +434,18 @@ docker logs -f msq-relay-api-1
 - **영향:** 프로덕션 API Key 유출
 - **대응:** `.gitignore`에 명시적으로 추가, Pre-commit Hook 설정 (선택 사항)
 
-### 리스크 3: Health Check 실패 시 무한 재시작
-- **영향:** 리소스 낭비
-- **대응:** `start_period` 30초 설정하여 초기화 시간 확보, 재시작 횟수 제한
-
 ---
 
-## 다음 단계
+## 구현 완료
 
-1. **Phase 1 시작:** Swagger/OpenAPI 통합 우선 구현
-2. **Phase 2 진행:** Production Docker Compose 작성
-3. **검증:** 각 Phase 완료 시 acceptance.md의 시나리오로 검증
-4. **문서화:** 모든 Phase 완료 후 README.md 업데이트
+모든 Phase가 완료되었습니다:
+
+1. ✅ **Phase 1**: Swagger/OpenAPI 통합 완료
+2. ✅ **Phase 2**: 환경별 설정 파일 생성 완료
+3. ✅ **Phase 3**: 운영 가이드 작성 완료
 
 ---
 
 **마지막 업데이트:** 2024-12-25
 **작성자:** @user
-**SPEC 버전:** 1.0.0
+**SPEC 버전:** 2.0.0

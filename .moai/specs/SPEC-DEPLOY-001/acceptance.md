@@ -2,7 +2,7 @@
 
 ## 개요
 
-이 문서는 SPEC-DEPLOY-001(프로덕션 배포 환경 설정, API 문서화 및 운영 가이드)의 완료 여부를 검증하기 위한 인수 기준을 정의합니다.
+이 문서는 SPEC-DEPLOY-001(API 문서화 및 운영 가이드)의 완료 여부를 검증하기 위한 인수 기준을 정의합니다.
 
 **검증 방법:** Given-When-Then 형식의 시나리오 기반 테스트
 
@@ -104,71 +104,7 @@ jq '.paths | keys' openapi.json
 
 ---
 
-## 시나리오 3: 프로덕션 배포 환경 검증
-
-### Given (사전 조건)
-- Docker Compose 설치 (2.20.0+)
-- `docker/docker-compose.prod.yml` 파일 존재
-- `.env.production` 파일 존재 (필수 환경 변수 설정됨)
-
-### When (실행 동작)
-1. 프로덕션 환경 시작: `make prod-up`
-2. 또는: `cd docker && docker-compose -f docker-compose.prod.yml up -d`
-
-### Then (예상 결과)
-1. **모든 서비스가 정상적으로 시작됨**
-   - `msq-relay-api-1`: 실행 중 (포트 3001)
-   - `msq-relay-api-2`: 실행 중 (포트 3002)
-   - `msq-redis-prod`: 실행 중 (포트 6379)
-   - `msq-oz-relayer-1-prod`: 실행 중
-   - `msq-oz-relayer-2-prod`: 실행 중
-   - `msq-oz-relayer-3-prod`: 실행 중
-
-2. **Health Check가 통과됨**
-   - relay-api-1: `http://localhost:3001/api/v1/health` → 200 OK
-   - relay-api-2: `http://localhost:3002/api/v1/health` → 200 OK
-
-3. **리소스 제한이 적용됨**
-   - relay-api: CPU 1.0 core, Memory 512MB
-   - OZ Relayer: CPU 0.5 core, Memory 256MB
-   - Redis: CPU 0.3 core, Memory 128MB
-
-4. **로그 로테이션이 설정됨**
-   - 최대 로그 크기: 10MB
-   - 최대 로그 파일 수: 3개
-
-### 검증 명령
-```bash
-# 프로덕션 환경 시작
-make prod-up
-
-# 서비스 상태 확인
-docker ps | grep msq-relay-api
-# 예상 결과: msq-relay-api-1, msq-relay-api-2 실행 중
-
-# Health Check 확인
-curl http://localhost:3001/api/v1/health
-curl http://localhost:3002/api/v1/health
-# 예상 결과: {"status":"ok", ...}
-
-# 또는 Makefile 타겟 사용
-make health-check
-
-# 리소스 제한 확인
-docker inspect msq-relay-api-1 | jq '.[0].HostConfig.NanoCpus'
-# 예상 결과: 1000000000 (1.0 CPU)
-
-docker inspect msq-relay-api-1 | jq '.[0].HostConfig.Memory'
-# 예상 결과: 536870912 (512MB)
-
-# 로그 로테이션 확인
-docker inspect msq-relay-api-1 | jq '.[0].HostConfig.LogConfig'
-# 예상 결과: {"Type":"json-file","Config":{"max-file":"3","max-size":"10m"}}
-```
-
----
-
-## 시나리오 4: 환경별 설정 파일 검증
+## 시나리오 3: 환경별 설정 파일 검증
 
 ### Given (사전 조건)
 - 환경별 설정 파일이 생성됨
@@ -180,7 +116,7 @@ docker inspect msq-relay-api-1 | jq '.[0].HostConfig.LogConfig'
 ### When (실행 동작)
 1. `.env.example` 파일을 `.env.production`으로 복사
 2. 필수 환경 변수 값 설정
-3. 프로덕션 환경 시작: `make prod-up`
+3. 환경 변수 설정이 올바르게 적용되었는지 확인
 
 ### Then (예상 결과)
 1. **`.env.example`이 Git에 포함됨**
@@ -229,79 +165,7 @@ docker exec msq-relay-api-1 printenv RELAY_API_KEY
 
 ---
 
-## 시나리오 5: Makefile 타겟 실행 검증
-
-### Given (사전 조건)
-- `Makefile`이 프로젝트 루트에 생성됨
-- 프로덕션 환경이 실행 중 (일부 타겟 테스트용)
-
-### When (실행 동작)
-1. `make prod-up` 실행
-2. `make health-check` 실행
-3. `make api-docs` 실행
-4. `make prod-down` 실행
-
-### Then (예상 결과)
-1. **`make prod-up`**
-   - 프로덕션 환경이 시작됨
-   - 성공 메시지 출력: "Production environment started."
-   - Swagger UI 접근 URL 출력
-
-2. **`make health-check`**
-   - relay-api-1, relay-api-2의 Health Check 결과 출력
-   - 상태: "ok"
-
-3. **`make api-docs`**
-   - `openapi.json` 파일이 생성됨
-   - 성공 메시지 출력: "OpenAPI JSON saved to openapi.json"
-
-4. **`make prod-down`**
-   - 프로덕션 환경이 종료됨
-   - 성공 메시지 출력: "Production environment stopped."
-
-### 검증 명령
-```bash
-# make prod-up 실행
-make prod-up
-# 예상 출력:
-# Starting production environment...
-# Production environment started.
-# Swagger UI: http://localhost:3001/api/docs
-# Swagger UI: http://localhost:3002/api/docs
-
-# make health-check 실행
-make health-check
-# 예상 출력:
-# Checking service health...
-# relay-api-1:
-# {"status":"ok", ...}
-# relay-api-2:
-# {"status":"ok", ...}
-
-# make api-docs 실행
-make api-docs
-# 예상 출력:
-# Extracting OpenAPI JSON...
-# OpenAPI JSON saved to openapi.json
-
-# openapi.json 파일 존재 확인
-ls -lh openapi.json
-# 예상 결과: 파일 존재, 크기 > 0 bytes
-
-# make prod-down 실행
-make prod-down
-# 예상 출력:
-# Stopping production environment...
-# Production environment stopped.
-
-# 서비스 종료 확인
-docker ps | grep msq-relay-api
-# 예상 결과: (출력 없음)
-```
-
----
-
-## 시나리오 6: Operations Guide 문서 접근성 검증
+## 시나리오 4: Operations Guide 문서 접근성 검증
 
 ### Given (사전 조건)
 - `docs/operations.md` 파일이 생성됨
@@ -362,7 +226,7 @@ cat docs/operations.md | grep "트러블슈팅"
 
 ---
 
-## 시나리오 7: TypeScript Client SDK 생성 검증 (선택 사항)
+## 시나리오 5: TypeScript Client SDK 생성 검증 (선택 사항)
 
 ### Given (사전 조건)
 - `openapi.json` 파일이 생성됨 (`make api-docs` 실행 완료)
@@ -404,42 +268,28 @@ npx tsc --noEmit
 ## 전체 인수 체크리스트
 
 ### Swagger/OpenAPI 통합
-- [ ] Swagger UI 접근 가능 (`http://localhost:3000/api/docs`)
-- [ ] 모든 API 엔드포인트 문서화 완료
-- [ ] OpenAPI JSON 다운로드 가능 (`http://localhost:3000/api/docs-json`)
-- [ ] OpenAPI 3.0 스키마 검증 통과
-- [ ] API Key 인증 UI 활성화
-
-### 프로덕션 Docker Compose
-- [ ] docker-compose.prod.yml 작성 완료
-- [ ] relay-api 2개 replica 시작 성공 (포트 3001, 3002)
-- [ ] Health Check 통과
-- [ ] 리소스 제한 적용 확인 (CPU, Memory)
-- [ ] 로그 로테이션 설정 확인
+- [x] Swagger UI 접근 가능 (`http://localhost:3000/api/docs`)
+- [x] 모든 API 엔드포인트 문서화 완료
+- [x] OpenAPI JSON 다운로드 가능 (`http://localhost:3000/api/docs-json`)
+- [x] OpenAPI 3.0 스키마 검증 통과
+- [x] API Key 인증 UI 활성화
 
 ### 환경별 설정 파일
-- [ ] .env.development 생성
-- [ ] .env.staging 생성
-- [ ] .env.production 생성
-- [ ] .env.example 생성 및 Git 포함
-- [ ] .gitignore에 민감 정보 파일 추가
-
-### Deployment Makefile
-- [ ] Makefile 생성
-- [ ] `make prod-up` 타겟 동작 확인
-- [ ] `make prod-down` 타겟 동작 확인
-- [ ] `make api-docs` 타겟 동작 확인
-- [ ] `make health-check` 타겟 동작 확인
+- [x] .env.development 생성
+- [x] .env.staging 생성
+- [x] .env.production 생성
+- [x] .env.example 생성 및 Git 포함
+- [x] .gitignore에 민감 정보 파일 추가
 
 ### Operations Guide
-- [ ] docs/operations.md 생성
-- [ ] 서비스 시작/중지 절차 기술
-- [ ] API 문서 접근 방법 기술
-- [ ] Client SDK 생성 가이드 기술
-- [ ] 트러블슈팅 시나리오 기술
+- [x] docs/operations.md 생성
+- [x] 서비스 시작/중지 절차 기술
+- [x] API 문서 접근 방법 기술
+- [x] Client SDK 생성 가이드 기술
+- [x] 트러블슈팅 시나리오 기술
 
 ### 선택 사항
-- [ ] TypeScript Client SDK 생성 성공 (`make generate-client`)
+- [ ] TypeScript Client SDK 생성 성공 (OpenAPI Generator 사용)
 - [ ] Swagger UI Try it out 기능 활성화
 - [ ] 트러블슈팅 시나리오 추가 (3개 이상)
 
@@ -447,21 +297,19 @@ npx tsc --noEmit
 
 ## 인수 기준 통과 조건
 
-**필수 조건 (5개 시나리오 모두 통과):**
+**필수 조건 (4개 시나리오 모두 통과):**
 1. ✅ 시나리오 1: Swagger UI 접근 및 API 문서 검증
 2. ✅ 시나리오 2: OpenAPI JSON 다운로드 및 스키마 검증
-3. ✅ 시나리오 3: 프로덕션 배포 환경 검증
-4. ✅ 시나리오 4: 환경별 설정 파일 검증
-5. ✅ 시나리오 6: Operations Guide 문서 접근성 검증
+3. ✅ 시나리오 3: 환경별 설정 파일 검증
+4. ✅ 시나리오 4: Operations Guide 문서 접근성 검증
 
 **권장 조건 (선택 사항):**
-6. ⭕ 시나리오 5: Makefile 타겟 실행 검증
-7. ⭕ 시나리오 7: TypeScript Client SDK 생성 검증
+5. ⭕ 시나리오 5: TypeScript Client SDK 생성 검증
 
-**최종 인수:** 필수 조건 5개 모두 통과 시 SPEC-DEPLOY-001 완료로 간주
+**최종 인수:** 필수 조건 4개 모두 통과 시 SPEC-DEPLOY-001 완료로 간주
 
 ---
 
 **마지막 업데이트:** 2024-12-25
 **작성자:** @user
-**SPEC 버전:** 1.0.0
+**SPEC 버전:** 2.0.0
