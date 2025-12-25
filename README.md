@@ -287,9 +287,112 @@ See [SPEC-PROXY-001](./docs/SPEC-PROXY-001.md) for detailed architecture.
 
 ---
 
+## Production Deployment (SPEC-DEPLOY-001)
+
+### Swagger UI & OpenAPI Documentation
+
+All API endpoints are documented with Swagger/OpenAPI 3.0:
+
+**Development Environment**:
+```
+http://localhost:3000/api/docs
+```
+
+**Production Environment**:
+```
+http://localhost:3001/api/docs  (Replica 1)
+http://localhost:3002/api/docs  (Replica 2)
+```
+
+**OpenAPI JSON** (for Client SDK generation):
+```bash
+# Extract OpenAPI JSON
+make api-docs
+
+# Generate TypeScript Client SDK (optional)
+make generate-client
+```
+
+### Production Deployment
+
+**Start Production Environment** (2 replicas + OZ Relayers + Redis):
+```bash
+# Using Makefile (recommended)
+make prod-up
+
+# Or using Docker Compose
+cd docker && docker-compose -f docker-compose.prod.yml up -d
+```
+
+**Check Service Health**:
+```bash
+make health-check
+
+# Or manually
+curl http://localhost:3001/api/v1/health | jq
+curl http://localhost:3002/api/v1/health | jq
+```
+
+**Stop Production Environment**:
+```bash
+make prod-down
+
+# Or using Docker Compose
+cd docker && docker-compose -f docker-compose.prod.yml down
+```
+
+### Environment Configuration
+
+Production environment uses environment-specific configuration files:
+
+```
+.env.development  # Local development
+.env.staging      # Staging environment
+.env.production   # Production (never commit to Git)
+.env.example      # Template (included in Git)
+```
+
+**Required Environment Variables**:
+- `NODE_ENV` - Environment (development, staging, production)
+- `PORT` - API port (default: 3000)
+- `RELAY_API_KEY` - API authentication key
+- `REDIS_HOST` - Redis host
+- `REDIS_PORT` - Redis port
+- `RPC_URL` - Blockchain RPC URL
+- `KEYSTORE_PASSPHRASE` - Relayer keystore passphrase
+
+### Makefile Commands
+
+Available deployment commands:
+
+```bash
+make prod-up              # Start production environment
+make prod-down            # Stop production environment
+make api-docs             # Extract OpenAPI JSON
+make health-check         # Check service health
+make generate-client      # Generate TypeScript Client SDK
+make help                 # Show all available commands
+```
+
+### Operations Guide
+
+Complete operations guide is available at:
+
+**[docs/operations.md](./docs/operations.md)**
+
+Topics covered:
+- Service start/stop procedures
+- API documentation access
+- Client SDK generation
+- Monitoring & troubleshooting
+- Emergency procedures
+- New team member onboarding
+
+---
+
 ## Status
 
-**Phase 1 Complete** (Direct + Gasless + Multi-Relayer Pool + Smart Contracts + Nginx Proxy + Transaction Status Polling)
+**Phase 1 Complete** (Direct + Gasless + Multi-Relayer Pool + Smart Contracts + Nginx Proxy + Transaction Status Polling + Production Deployment)
 
 ### Test Results
 - ✅ All 147 tests passing (smart contracts)
@@ -299,8 +402,10 @@ See [SPEC-PROXY-001](./docs/SPEC-PROXY-001.md) for detailed architecture.
 - ✅ Nginx Load Balancer integrated with 3+ relayers
 - ✅ Health check endpoint functional
 - ✅ API Key authentication enforced
+- ✅ Swagger/OpenAPI documentation complete
+- ✅ Production deployment configuration ready
 
 ---
 
-**Version**: 12.4
-**Last Updated**: 2025-12-23
+**Version**: 12.5
+**Last Updated**: 2025-12-25
