@@ -1,6 +1,9 @@
 import { NestFactory } from "@nestjs/core";
+import { Logger } from "@nestjs/common";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { AppModule } from "./app.module";
+
+const logger = new Logger("Bootstrap");
 
 /**
  * Validate required environment variables for production deployment
@@ -10,8 +13,8 @@ function validateEnvironmentVariables(): void {
   const missingVars = requiredVars.filter((v) => !process.env[v]);
 
   if (missingVars.length > 0) {
-    console.error(
-      `[ERROR] Missing required environment variables: ${missingVars.join(", ")}`
+    logger.error(
+      `Missing required environment variables: ${missingVars.join(", ")}`
     );
     process.exit(1);
   }
@@ -19,8 +22,8 @@ function validateEnvironmentVariables(): void {
   // Reject weak placeholder values
   const weakPlaceholders = ["your-api-key-here", "your-api-key"];
   if (weakPlaceholders.includes(process.env.RELAY_API_KEY || "")) {
-    console.error(
-      "[ERROR] Insecure RELAY_API_KEY detected. Please generate a secure API key."
+    logger.error(
+      "Insecure RELAY_API_KEY detected. Please generate a secure API key."
     );
     process.exit(1);
   }
@@ -57,10 +60,10 @@ async function bootstrap() {
   const port = process.env.PORT || 3000;
   await app.listen(port);
 
-  console.log(`MSQ Relayer API Gateway is running on port ${port}`);
-  console.log(`Health check: http://localhost:${port}/api/v1/health`);
-  console.log(`Swagger UI: http://localhost:${port}/api/docs`);
-  console.log(`OpenAPI JSON: http://localhost:${port}/api/docs-json`);
+  logger.log(`MSQ Relayer API Gateway is running on port ${port}`);
+  logger.log(`Health check: http://localhost:${port}/api/v1/health`);
+  logger.log(`Swagger UI: http://localhost:${port}/api/docs`);
+  logger.log(`OpenAPI JSON: http://localhost:${port}/api/docs-json`);
 }
 
 bootstrap();

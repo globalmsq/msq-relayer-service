@@ -166,7 +166,7 @@ export class OzRelayerService {
    * @returns Transaction status and details
    * @throws ServiceUnavailableException if OZ Relayer is unavailable
    */
-  async getTransactionStatus(txId: string): Promise<any> {
+  async getTransactionStatus(txId: string): Promise<OzRelayerTxData> {
     try {
       const relayerId = await this.getRelayerId();
       const response = await firstValueFrom(
