@@ -6,8 +6,8 @@
 **Blockchain Transaction Relayer System (MSQ Relayer Service)**
 
 ### Document Version
-- **Version**: 12.3
-- **Last Updated**: 2025-12-23
+- **Version**: 12.4
+- **Last Updated**: 2025-12-30
 - **Status**: Phase 1 MVP Complete (Direct TX + Gasless TX with EIP-712 Verification + Transaction Status Polling)
 
 ### Related Documents
@@ -51,7 +51,7 @@ As OpenZeppelin Defender service will be discontinued in July 2026, we are build
 **Phase 2+**:
 | Feature | Description | Implementation |
 |---------|-------------|----------------|
-| **Queue System** | Transaction queuing and sequential processing | Redis(BullMQ) / AWS SQS (QUEUE_PROVIDER) |
+| **Queue System** | Async transaction processing with DLQ | AWS SQS + LocalStack (Local Dev) |
 | **Policy Engine** | Contract/Method Whitelist, Blacklist | NestJS Policy Module |
 | **Monitor Service** | Blockchain event monitoring | Using OZ Monitor |
 
@@ -158,10 +158,11 @@ As OpenZeppelin Defender service will be discontinued in July 2026, we are build
 - Status change push notifications
 
 **Queue System (P1)**:
-- Queue Adapter pattern (QUEUE_PROVIDER configuration)
-- Redis + BullMQ implementation (Default)
-- AWS SQS implementation (Optional)
-- Job status tracking API
+- AWS SQS Standard Queue for async transaction processing
+- LocalStack for local development (AWS SQS emulation)
+- Nginx Load Balancer for multi-relayer routing
+- Dead Letter Queue (DLQ) with 3 retry limit
+- Job status tracking API (`GET /api/v1/relay/job/:jobId`)
 
 **Policy Engine (P1)**:
 - Contract Whitelist verification
@@ -269,6 +270,8 @@ As OpenZeppelin Defender service will be discontinued in July 2026, we are build
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 12.4 | 2025-12-30 | Queue System architecture update - Changed from Redis+BullMQ to AWS SQS+LocalStack, Added Nginx LB for multi-relayer routing, Added DLQ with 3 retry limit, Updated Section 1.3 and 3.2 Queue System descriptions |
+| 12.3 | 2025-12-23 | Transaction Status Polling API - Added SPEC-STATUS-001 reference |
 | 12.2 | 2025-12-22 | Phase 1 MVP Completion - Updated version status from 12.1 to 12.2, Marked all Week 4 and Week 5 objectives as Complete, Added EIP-712 Verification, Nonce Management, and Multi-Relayer Pool to Phase 1 Core Features, Updated milestones table with all phases complete |
 | 12.1 | 2025-12-19 | SPEC-CONTRACTS-001 integration - Updated Section 3.1 with contract deployment status, Updated Section 6 milestones with Week 3 completion, Added SPEC links and cross-references |
 | 12.0 | 2025-12-15 | Document version sync - Complete document structure cleanup, Remove duplicates, Establish cross-reference system |

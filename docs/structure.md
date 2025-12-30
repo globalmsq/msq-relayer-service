@@ -1,9 +1,9 @@
 # MSQ Relayer Service - Structure Document
 
 ## Document Information
-- **Version**: 12.2
-- **Last Updated**: 2025-12-22
-- **Status**: Phase 1 MVP Complete (Direct TX + Gasless TX with EIP-712 Verification + Single OZ Relayer)
+- **Version**: 12.3
+- **Last Updated**: 2025-12-30
+- **Status**: Phase 1 MVP Complete (Direct TX + Gasless TX with EIP-712 Verification + Multi-Relayer Pool)
 
 ### Related Documents
 - [Product Requirements](./product.md)
@@ -85,10 +85,10 @@ It utilizes **OZ open-source (Relayer + Monitor)** as its core, with NestJS API 
                     ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                      Infrastructure                              │
-│  ┌───────────┐ ┌───────────┐                                   │
-│  │ Redis     │ │ Prometheus│                                   │
-│  │ (Queue)   │ │ + Grafana │                                   │
-│  └───────────┘ └───────────┘                                   │
+│  ┌───────────┐ ┌───────────┐ ┌───────────┐                     │
+│  │ LocalStack│ │ Redis     │ │ Prometheus│                     │
+│  │ (SQS)     │ │ (Relayer) │ │ + Grafana │                     │
+│  └───────────┘ └───────────┘ └───────────┘                     │
 └─────────────────────────────────────────────────────────────────┘
                     │
                     ▼
@@ -131,7 +131,8 @@ flowchart TB
     end
 
     subgraph Infra["Infrastructure"]
-        Redis["Redis\n(Queue)"]
+        LocalStack["LocalStack\n(SQS Queue)"]
+        Redis["Redis\n(OZ Relayer)"]
         Prometheus["Prometheus\n+ Grafana"]
     end
 
@@ -165,21 +166,29 @@ flowchart TB
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                NestJS API Gateway (Load Balancer)            │
+│                NestJS API Gateway                            │
 │  ┌───────────┐ ┌───────────────┐ ┌─────────────────────┐   │
-│  │ Auth      │ │ Relayer       │ │ Pool Health         │   │
-│  │ Module    │ │ Router        │ │ Monitor             │   │
+│  │ Auth      │ │ Queue         │ │ Pool Health         │   │
+│  │ Module    │ │ Service (SQS) │ │ Monitor             │   │
 │  └───────────┘ └───────────────┘ └─────────────────────┘   │
 └─────────────────────────┬───────────────────────────────────┘
-                          │ Routing Strategy: Round Robin / Least Load
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────┐
+│                Nginx Load Balancer                           │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │  upstream oz-relayers { least_conn; }                │   │
+│  └─────────────────────────────────────────────────────┘   │
+└─────────────────────────┬───────────────────────────────────┘
+                          │ Routing Strategy: Least Connections
           ┌───────────────┼───────────────┐
           ▼               ▼               ▼
 ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
-│ OZ Relayer #1   │ │ OZ Relayer #2   │ │ OZ Relayer #N   │
+│ OZ Relayer #1   │ │ OZ Relayer #2   │ │ OZ Relayer #3   │
 │ ─────────────── │ │ ─────────────── │ │ ─────────────── │
-│ Key: 0xAAA...   │ │ Key: 0xBBB...   │ │ Key: 0xNNN...   │
-│ Balance: 1 ETH  │ │ Balance: 1 ETH  │ │ Balance: 1 ETH  │
-│ Status: Active  │ │ Status: Active  │ │ Status: Standby │
+│ Key: 0xAAA...   │ │ Key: 0xBBB...   │ │ Key: 0xCCC...   │
+│ Port: 8081      │ │ Port: 8082      │ │ Port: 8083      │
+│ Status: Active  │ │ Status: Active  │ │ Status: Active  │
 └────────┬────────┘ └────────┬────────┘ └────────┬────────┘
          │                   │                   │
          └───────────────────┴───────────────────┘
@@ -187,7 +196,8 @@ flowchart TB
                              ▼
                     ┌─────────────────┐
                     │     Redis       │
-                    │  (Shared Queue) │
+                    │ (OZ Relayer     │
+                    │  Internal Queue)│
                     └─────────────────┘
 ```
 
@@ -865,6 +875,7 @@ sequenceDiagram
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 12.3 | 2025-12-30 | Queue System architecture update - Updated Infrastructure diagram (LocalStack SQS + Redis for Relayer), Updated Multi-Relayer Pool Architecture with Nginx LB, Updated Mermaid diagrams, Changed status to Multi-Relayer Pool |
 | 12.2 | 2025-12-22 | Phase 1 MVP Completion - Updated version to 12.2, Changed architecture status to Single OZ Relayer instance, Updated Section 1.2 OZ Service Role Separation with Phase 1 Single Instance note, Added Status column to Module Responsibility table (all Phase 1 modules marked Complete), Updated Implementation Scope with Phase 1/2+ separation |
 | 12.1 | 2025-12-19 | SPEC-CONTRACTS-001 integration - Added packages/contracts structure to Section 3, Expanded Section 4.4 with deployment artifacts, test suites, and deployment commands, Updated related documents section with SPEC links and cross-references |
 | 12.0 | 2025-12-15 | Document version sync - Complete document structure cleanup, Remove duplicates, Establish cross-reference system |

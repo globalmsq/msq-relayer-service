@@ -1,8 +1,8 @@
 # MSQ Relayer Service - Technical Document
 
 ## Document Information
-- **Version**: 12.6
-- **Last Updated**: 2025-12-23
+- **Version**: 12.7
+- **Last Updated**: 2025-12-30
 - **Status**: Phase 1 Complete (Direct + Gasless + Multi-Relayer Proxy + Nginx LB + Transaction Status Polling + API Key Authentication)
 
 > **Note**: This document covers technical implementation details (HOW).
@@ -39,7 +39,7 @@ Defines the technical stack and implementation specifications for the Blockchain
 | Phase | Technical Scope | Status |
 |-------|-----------------|--------|
 | **Phase 1** | OZ Relayer (3x instances), Redis, Nginx Load Balancer, NestJS (Auth, Direct TX API, Gasless TX, EIP-712 Verification, Health, Status Polling), ERC2771Forwarder | **Complete** ✅ |
-| **Phase 2+** | TX History (MySQL), Webhook Handler, Queue System (Redis/SQS), OZ Monitor, Policy Engine | Planned |
+| **Phase 2+** | TX History (MySQL), Webhook Handler, Queue System (AWS SQS + LocalStack), OZ Monitor, Policy Engine | Planned |
 
 ---
 
@@ -2407,78 +2407,210 @@ export default config;
 
 ## 16. Queue System (Phase 2+)
 
-> **QUEUE_PROVIDER Pattern**: Selectively use Redis+BullMQ or AWS SQS depending on environment.
+> **Architecture**: AWS SQS Standard Queue with LocalStack for local development. No QUEUE_PROVIDER pattern - SQS is the unified queue solution across all environments.
 
-### 15.1 Queue Architecture
+### 16.1 Queue Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    NestJS API Gateway                        │
-│  ┌───────────────────────────────────────────────────────┐  │
-│  │                   Queue Adapter                        │  │
-│  │  ┌─────────────────┐    ┌─────────────────────────┐   │  │
-│  │  │ QUEUE_PROVIDER  │────│ Redis+BullMQ (default)  │   │  │
-│  │  │ env variable    │    │ AWS SQS (production)    │   │  │
-│  │  └─────────────────┘    └─────────────────────────┘   │  │
-│  └───────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                         NestJS API Gateway                           │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │                      Queue Module                              │  │
+│  │  ┌─────────────┐    ┌─────────────┐    ┌─────────────────┐   │  │
+│  │  │ QueueService│────│ SqsAdapter  │────│ AWS SQS         │   │  │
+│  │  └─────────────┘    └─────────────┘    │ (LocalStack Dev)│   │  │
+│  │                                         └─────────────────┘   │  │
+│  │  ┌─────────────┐    ┌─────────────┐                          │  │
+│  │  │ JobService  │────│ JobController│ GET /relay/job/:jobId   │  │
+│  │  └─────────────┘    └─────────────┘                          │  │
+│  │                                                               │  │
+│  │  ┌───────────────────────────────────────────────────────┐   │  │
+│  │  │                  QueueConsumer                         │   │  │
+│  │  │  Long-polling (20s) → Process → Delete                 │   │  │
+│  │  └───────────────────────────────────────────────────────┘   │  │
+│  └───────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────┬───────────────────────────────────┘
+                                  │
+                                  ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                        Nginx Load Balancer                           │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │  upstream oz-relayers { least_conn; }                        │   │
+│  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐            │   │
+│  │  │ oz-relayer-1│ │ oz-relayer-2│ │ oz-relayer-3│            │   │
+│  │  │ (Port 8081) │ │ (Port 8082) │ │ (Port 8083) │            │   │
+│  │  └─────────────┘ └─────────────┘ └─────────────┘            │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-### 15.2 Provider Comparison
+### 16.2 Environment Comparison
 
-| Item | Redis + BullMQ | AWS SQS |
-|------|----------------|---------|
-| Environment | Local/Dev/Test | Production |
-| Configuration Complexity | Low | Medium |
-| Cost | Infrastructure only | Per-request billing |
-| Scalability | Requires horizontal scaling | Auto-scaling |
-| Message Retention | Volatile (configurable) | 4-day default retention |
-| Latency | Very low | Low |
+| Config | Local Dev | Staging | Production |
+|--------|-----------|---------|------------|
+| Queue Service | LocalStack SQS | AWS SQS | AWS SQS |
+| Load Balancer | Nginx Container | Nginx/ALB | AWS ALB |
+| Relayers | 3x Docker | 3-5x K8s | Auto-scale K8s |
+| Endpoint | `http://localstack:4566` | AWS endpoint | AWS endpoint |
 
-### 15.3 Environment Configuration
+### 16.3 SQS Queue Design
+
+| Item | Value | Rationale |
+|------|-------|-----------|
+| Queue Type | Standard Queue | High throughput, transaction order-independent |
+| DLQ | relay-tx-dlq | Failed message isolation |
+| Max Receive Count | 3 | Retry limit before DLQ |
+| Visibility Timeout | 30 seconds | Processing time allowance |
+| Long Polling | 20 seconds | Reduce empty responses |
+| AWS Region | ap-northeast-2 | Match production environment |
+
+### 16.4 Environment Configuration
 
 ```bash
 # .env file
-# Redis (default)
-QUEUE_PROVIDER=redis
-REDIS_URL=redis://localhost:6379
 
-# AWS SQS (production)
-QUEUE_PROVIDER=sqs
+# Queue Feature Flag
+QUEUE_ENABLED=true
+
+# AWS Configuration
 AWS_REGION=ap-northeast-2
-AWS_SQS_QUEUE_URL=https://sqs.ap-northeast-2.amazonaws.com/123456789012/relayer-queue
+AWS_ACCESS_KEY_ID=test                    # LocalStack default
+AWS_SECRET_ACCESS_KEY=test                # LocalStack default
+
+# SQS Queue URLs
+SQS_QUEUE_URL=http://localstack:4566/000000000000/relay-tx-queue
+SQS_DLQ_URL=http://localstack:4566/000000000000/relay-tx-dlq
+
+# LocalStack Endpoint (local dev only)
+LOCALSTACK_ENDPOINT=http://localstack:4566
+
+# Consumer Settings
+SQS_VISIBILITY_TIMEOUT=30
+SQS_WAIT_TIME_SECONDS=20
+SQS_MAX_RETRIES=3
+
+# OZ Relayer URL (via Nginx LB)
+OZ_RELAYER_URL=http://oz-relayer-lb:80
 ```
 
-### 15.4 Queue Adapter Interface
+### 16.5 Queue Module Structure
+
+```
+packages/relay-api/src/
+└── queue/                              # Queue Module
+    ├── queue.module.ts                 # NestJS DynamicModule
+    ├── queue.service.ts                # Enqueue operations
+    ├── queue.consumer.ts               # Long-polling consumer
+    ├── sqs/
+    │   ├── sqs.adapter.ts              # AWS SDK SQS wrapper
+    │   ├── sqs.config.ts               # Configuration types
+    │   └── sqs.health.ts               # Health indicator
+    ├── job/
+    │   ├── job.controller.ts           # GET /api/v1/relay/job/:jobId
+    │   └── job.service.ts              # In-memory job tracking
+    ├── dto/
+    │   ├── queue-job.dto.ts            # Job status response
+    │   └── enqueue-response.dto.ts     # Enqueue response
+    └── interfaces/
+        ├── queue-message.interface.ts  # Message types
+        └── queue-job.interface.ts      # Job status types
+```
+
+### 16.6 Queue Interfaces
 
 ```typescript
-// packages/relay-api/src/queue/queue-adapter.interface.ts
-interface QueueAdapter {
-  enqueue(job: RelayJob): Promise<string>;  // returns jobId
-  getJob(jobId: string): Promise<JobStatus>;
-  cancelJob(jobId: string): Promise<boolean>;
-}
-
-interface RelayJob {
+// packages/relay-api/src/queue/interfaces/queue-message.interface.ts
+export interface QueueMessage {
+  jobId: string;
   type: 'direct' | 'gasless';
   payload: DirectTxRequest | GaslessTxRequest;
   priority?: 'high' | 'normal' | 'low';
   metadata?: Record<string, string>;
+  createdAt: string;
 }
 
-interface JobStatus {
+// packages/relay-api/src/queue/interfaces/queue-job.interface.ts
+export interface QueueJob {
   jobId: string;
   status: 'queued' | 'processing' | 'completed' | 'failed';
+  txId?: string;
   txHash?: string;
   error?: string;
   createdAt: Date;
   updatedAt: Date;
 }
+
+export type JobStatus = 'queued' | 'processing' | 'completed' | 'failed';
 ```
 
-### 15.5 API Changes (Queue Mode)
+### 16.7 SQS Adapter Implementation
 
-API responses change when Queue system is enabled:
+```typescript
+// packages/relay-api/src/queue/sqs/sqs.adapter.ts
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import {
+  SQSClient,
+  SendMessageCommand,
+  ReceiveMessageCommand,
+  DeleteMessageCommand,
+  Message,
+} from '@aws-sdk/client-sqs';
+import { QueueMessage } from '../interfaces/queue-message.interface';
+
+@Injectable()
+export class SqsAdapter {
+  private client: SQSClient;
+
+  constructor(private configService: ConfigService) {
+    this.client = new SQSClient({
+      region: this.configService.get('AWS_REGION', 'ap-northeast-2'),
+      endpoint: this.configService.get('LOCALSTACK_ENDPOINT'), // undefined in prod
+      credentials: {
+        accessKeyId: this.configService.get('AWS_ACCESS_KEY_ID', 'test'),
+        secretAccessKey: this.configService.get('AWS_SECRET_ACCESS_KEY', 'test'),
+      },
+    });
+  }
+
+  async sendMessage(queueUrl: string, message: QueueMessage): Promise<string> {
+    const command = new SendMessageCommand({
+      QueueUrl: queueUrl,
+      MessageBody: JSON.stringify(message),
+      MessageAttributes: {
+        jobId: { DataType: 'String', StringValue: message.jobId },
+        type: { DataType: 'String', StringValue: message.type },
+      },
+    });
+    const result = await this.client.send(command);
+    return result.MessageId!;
+  }
+
+  async receiveMessages(queueUrl: string, maxMessages = 10): Promise<Message[]> {
+    const command = new ReceiveMessageCommand({
+      QueueUrl: queueUrl,
+      MaxNumberOfMessages: maxMessages,
+      WaitTimeSeconds: this.configService.get('SQS_WAIT_TIME_SECONDS', 20),
+      VisibilityTimeout: this.configService.get('SQS_VISIBILITY_TIMEOUT', 30),
+      MessageAttributeNames: ['All'],
+    });
+    const result = await this.client.send(command);
+    return result.Messages || [];
+  }
+
+  async deleteMessage(queueUrl: string, receiptHandle: string): Promise<void> {
+    const command = new DeleteMessageCommand({
+      QueueUrl: queueUrl,
+      ReceiptHandle: receiptHandle,
+    });
+    await this.client.send(command);
+  }
+}
+```
+
+### 16.8 API Changes (Queue Mode)
+
+API responses change when Queue system is enabled (`QUEUE_ENABLED=true`):
 
 ```yaml
 # Queue disabled (Phase 1 - immediate processing)
@@ -2495,8 +2627,7 @@ POST /api/v1/relay/direct
 Response (202 Accepted):
 {
   "jobId": "uuid",
-  "status": "queued",
-  "estimatedWait": "5s"
+  "status": "queued"
 }
 
 # Job status query
@@ -2505,44 +2636,104 @@ Response:
 {
   "jobId": "uuid",
   "status": "completed",
-  "txHash": "0x...",
-  "txId": "uuid"
+  "txId": "uuid",
+  "txHash": "0x..."
+}
+
+# Queue disabled response
+GET /api/v1/relay/job/{jobId}
+Response (503 Service Unavailable):
+{
+  "error": "Queue system is not enabled"
 }
 ```
 
-### 15.6 Redis + BullMQ Configuration
+### 16.9 Docker Compose Integration
 
-```typescript
-// packages/relay-api/src/queue/redis-queue.adapter.ts
-import { Queue, Worker } from 'bullmq';
+```yaml
+# docker/docker-compose.yaml
 
-const relayQueue = new Queue('relay-jobs', {
-  connection: {
-    host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT || '6379')
+services:
+  localstack:
+    image: localstack/localstack:latest
+    ports:
+      - "4566:4566"
+    environment:
+      SERVICES: sqs
+      AWS_DEFAULT_REGION: ap-northeast-2
+    volumes:
+      - ./scripts/init-localstack.sh:/etc/localstack/init/ready.d/init-sqs.sh:ro
+      - localstack-data:/var/lib/localstack
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - msq-relayer-network
+
+  relay-api:
+    depends_on:
+      localstack:
+        condition: service_healthy
+      oz-relayer-lb:
+        condition: service_healthy
+    environment:
+      QUEUE_ENABLED: "true"
+      AWS_REGION: ap-northeast-2
+      SQS_QUEUE_URL: http://localstack:4566/000000000000/relay-tx-queue
+      SQS_DLQ_URL: http://localstack:4566/000000000000/relay-tx-dlq
+      LOCALSTACK_ENDPOINT: http://localstack:4566
+      OZ_RELAYER_URL: http://oz-relayer-lb:80
+
+volumes:
+  localstack-data:
+```
+
+### 16.10 LocalStack Initialization Script
+
+```bash
+#!/bin/bash
+# docker/scripts/init-localstack.sh
+
+# Create main queue with DLQ redrive policy
+awslocal sqs create-queue --queue-name relay-tx-dlq
+
+awslocal sqs create-queue \
+  --queue-name relay-tx-queue \
+  --attributes '{
+    "RedrivePolicy": "{\"deadLetterTargetArn\":\"arn:aws:sqs:ap-northeast-2:000000000000:relay-tx-dlq\",\"maxReceiveCount\":\"3\"}"
+  }'
+
+echo "SQS queues created successfully"
+awslocal sqs list-queues
+```
+
+### 16.11 Backward Compatibility
+
+| QUEUE_ENABLED | Behavior |
+|---------------|----------|
+| `false` (default) | Phase 1 behavior - immediate processing, 200 OK response |
+| `true` | Queue mode - async processing, 202 Accepted + jobId response |
+
+Queue disabled state maintains full Phase 1 API compatibility. No breaking changes for existing clients.
+
+### 16.12 Dependencies
+
+```json
+// packages/relay-api/package.json
+{
+  "dependencies": {
+    "@aws-sdk/client-sqs": "^3.700.0",
+    "uuid": "^11.0.0"
   },
-  defaultJobOptions: {
-    attempts: 3,
-    backoff: {
-      type: 'exponential',
-      delay: 1000
-    }
+  "devDependencies": {
+    "@types/uuid": "^10.0.0"
   }
-});
+}
 ```
 
-### 15.7 AWS SQS Configuration
-
-```typescript
-// packages/relay-api/src/queue/sqs-queue.adapter.ts
-import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs';
-
-const sqsClient = new SQSClient({
-  region: process.env.AWS_REGION || 'ap-northeast-2'
-});
-
-const queueUrl = process.env.AWS_SQS_QUEUE_URL;
-```
+> **Note**: Redis is retained for OZ Relayer internal queue only. Application-level queue uses AWS SQS exclusively.
 
 ---
 
@@ -2834,6 +3025,7 @@ pnpm --filter @msq-relayer/integration-tests test:lifecycle
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 12.7 | 2025-12-30 | Queue System architecture update - Complete Section 16 rewrite: changed from QUEUE_PROVIDER pattern (Redis+BullMQ/SQS) to AWS SQS-only with LocalStack for local dev, added Nginx LB multi-relayer architecture diagram, updated environment configuration, added SQS adapter implementation, LocalStack init script, Docker Compose integration |
 | 12.4 | 2025-12-19 | Section 4 Smart Contracts expansion - Replaced basic overview with comprehensive SPEC-CONTRACTS-001 integration (Section 4.1-4.10): project structure, OpenZeppelin usage, ERC2771Forwarder deployment, sample contracts, deployment scripts, test coverage, verification process, related specifications |
 | 12.3 | 2025-12-16 | Phase 1 completion - Updated version and status to reflect Phase 1 complete, added Docker Setup Guide cross-reference |
 | 12.2 | 2025-12-15 | Section 5.5 Health Check API expansion - Added Relayer Pool Status Aggregation NestJS implementation example (HealthService, checkRelayerPoolHealth, aggregateStatus), Added Detailed Health Response JSON example (including degraded status) |

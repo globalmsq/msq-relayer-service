@@ -103,14 +103,12 @@ services:
     ports:
       - "3306:3306"
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-secure-root-password}
+      MYSQL_ROOT_PASSWORD: pass
       MYSQL_DATABASE: msq_relayer
-      MYSQL_USER: relayer_user
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-secure-user-password}
     volumes:
       - msq-relayer-mysql-data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-secure-root-password}"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-ppass"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -138,7 +136,7 @@ services:
       NODE_ENV: development
       REDIS_URL: redis://redis:6379
       REDIS_STATUS_TTL_SECONDS: ${REDIS_STATUS_TTL_SECONDS:-600}
-      DATABASE_URL: ${DATABASE_URL:-mysql://relayer_user:secure-user-password@mysql:3306/msq_relayer}
+      DATABASE_URL: ${DATABASE_URL:-mysql://root:pass@mysql:3306/msq_relayer}
       # Uses local hardhat-node (shared with msqpay-monorepo via msq-network)
       RPC_URL: ${RPC_URL:-http://hardhat-node:8545}
       RELAY_API_KEY: ${RELAY_API_KEY:-local-dev-api-key}
