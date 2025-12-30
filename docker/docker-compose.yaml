@@ -95,6 +95,30 @@ services:
       - msq-relayer-network
     restart: unless-stopped
 
+  # === MySQL Database (Phase 2+) ===
+  mysql:
+    image: mysql:8.0
+    profiles: ["phase2"]
+    container_name: msq-relayer-mysql
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-secure-root-password}
+      MYSQL_DATABASE: msq_relayer
+      MYSQL_USER: relayer_user
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-secure-user-password}
+    volumes:
+      - msq-relayer-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-secure-root-password}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - msq-relayer-network
+    restart: unless-stopped
+
   # === Relay API (NestJS) ===
   relay-api:
     build:
@@ -113,6 +137,8 @@ services:
       PORT: 8080
       NODE_ENV: development
       REDIS_URL: redis://redis:6379
+      REDIS_STATUS_TTL_SECONDS: ${REDIS_STATUS_TTL_SECONDS:-600}
+      DATABASE_URL: ${DATABASE_URL:-mysql://relayer_user:secure-user-password@mysql:3306/msq_relayer}
       # Uses local hardhat-node (shared with msqpay-monorepo via msq-network)
       RPC_URL: ${RPC_URL:-http://hardhat-node:8545}
       RELAY_API_KEY: ${RELAY_API_KEY:-local-dev-api-key}
@@ -123,6 +149,9 @@ services:
       # (Load balancer causes ID mismatch between getRelayerId and sendTransaction)
       OZ_RELAYER_URL: http://oz-relayer-1:8080
       OZ_RELAYER_API_KEY: ${OZ_RELAYER_API_KEY:-oz-relayer-shared-api-key-local-dev}
+      # Phase 2: Webhook & Notification settings
+      WEBHOOK_SIGNING_KEY: ${WEBHOOK_SIGNING_KEY:-local-dev-webhook-signing-key-32ch}
+      CLIENT_WEBHOOK_URL: ${CLIENT_WEBHOOK_URL:-http://host.docker.internal:9000/webhooks/transaction-updates}
     networks:
       - msq-relayer-network
       - msq-network
@@ -193,4 +222,6 @@ networks:
 
 volumes:
   msq-relayer-redis-data:
+    driver: local
+  msq-relayer-mysql-data:
     driver: local
