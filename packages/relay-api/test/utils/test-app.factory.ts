@@ -7,6 +7,8 @@ import { AppModule } from '../../src/app.module';
 import { OzRelayerService } from '../../src/oz-relayer/oz-relayer.service';
 import { GaslessService } from '../../src/relay/gasless/gasless.service';
 import { StatusModule } from '../../src/relay/status/status.module';
+import { RedisService } from '../../src/redis/redis.service';
+import { PrismaService } from '../../src/prisma/prisma.service';
 import { TEST_CONFIG } from '../fixtures/test-config';
 import {
   createMockOzRelayerResponse,
@@ -30,6 +32,48 @@ const defaultOzRelayerMock = {
   sendTransaction: jest.fn().mockResolvedValue(createMockOzRelayerResponse()),
   getTransactionStatus: jest.fn().mockResolvedValue(createMockConfirmedResponse()),
   getRelayerId: jest.fn().mockResolvedValue('test-relayer-id'),
+};
+
+// Default mock for Redis client (ioredis instance) - Prevents real Redis connections
+export const defaultRedisClientMock = {
+  get: jest.fn().mockResolvedValue(null),
+  set: jest.fn().mockResolvedValue('OK'),
+  del: jest.fn().mockResolvedValue(1),
+  exists: jest.fn().mockResolvedValue(0),
+  ttl: jest.fn().mockResolvedValue(-1),
+  flushall: jest.fn().mockResolvedValue('OK'),
+  ping: jest.fn().mockResolvedValue('PONG'),
+  quit: jest.fn().mockResolvedValue('OK'),
+  disconnect: jest.fn(),
+  on: jest.fn(),
+};
+
+// Default mock for RedisService (L1 Cache)
+export const defaultRedisMock = {
+  get: jest.fn().mockResolvedValue(null),
+  set: jest.fn().mockResolvedValue(undefined),
+  del: jest.fn().mockResolvedValue(undefined),
+  exists: jest.fn().mockResolvedValue(false),
+  ttl: jest.fn().mockResolvedValue(-1),
+  flushAll: jest.fn().mockResolvedValue(undefined),
+  healthCheck: jest.fn().mockResolvedValue(true),
+  onModuleDestroy: jest.fn().mockResolvedValue(undefined),
+};
+
+// Default mock for PrismaService (L2 Cache / MySQL)
+export const defaultPrismaMock = {
+  $connect: jest.fn().mockResolvedValue(undefined),
+  $disconnect: jest.fn().mockResolvedValue(undefined),
+  onModuleInit: jest.fn().mockResolvedValue(undefined),
+  onModuleDestroy: jest.fn().mockResolvedValue(undefined),
+  transaction: {
+    findUnique: jest.fn().mockResolvedValue(null),
+    findMany: jest.fn().mockResolvedValue([]),
+    create: jest.fn().mockResolvedValue({ id: 'test-tx-id' }),
+    update: jest.fn().mockResolvedValue({ id: 'test-tx-id' }),
+    upsert: jest.fn().mockResolvedValue({ id: 'test-tx-id' }),
+    delete: jest.fn().mockResolvedValue({ id: 'test-tx-id' }),
+  },
 };
 
 // Default mock for HttpService (for RPC calls in GaslessService)
@@ -92,6 +136,15 @@ export async function createTestApp(): Promise<INestApplication> {
     .useFactory({
       factory: () => defaultHttpServiceMock,
     })
+    // Mock REDIS_CLIENT (ioredis instance) - Critical: prevents real Redis connections
+    .overrideProvider('REDIS_CLIENT')
+    .useValue(defaultRedisClientMock)
+    // Mock RedisService (L1 Cache)
+    .overrideProvider(RedisService)
+    .useValue(defaultRedisMock)
+    // Mock PrismaService (L2 Cache / MySQL) - Critical: prevents real DB connections
+    .overrideProvider(PrismaService)
+    .useValue(defaultPrismaMock)
     .compile();
 
   // Store for module-scoped access
