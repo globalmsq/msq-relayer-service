@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { HttpModule } from '@nestjs/axios';
 import { ConsumerService } from './consumer.service';
 import { SqsAdapter } from './sqs/sqs.adapter';
 import { OzRelayerClient } from './relay/oz-relayer.client';
@@ -12,6 +13,7 @@ import configuration from './config/configuration';
       load: [configuration],
       isGlobal: true,
     }),
+    HttpModule,
   ],
   providers: [
     ConsumerService,

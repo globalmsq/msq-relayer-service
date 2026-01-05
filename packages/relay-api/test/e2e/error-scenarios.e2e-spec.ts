@@ -6,6 +6,7 @@ import {
   getOzRelayerServiceMock,
   getGaslessServiceMock,
   getHttpServiceMock,
+  getSqsAdapterMock,
   resetMocks,
 } from "../utils/test-app.factory";
 import { TEST_WALLETS, TEST_ADDRESSES } from "../fixtures/test-wallets";
@@ -17,11 +18,13 @@ import {
 /**
  * Error Scenarios E2E Tests
  *
+ * SPEC-QUEUE-001: Updated for queue-based architecture
+ *
  * Tests for various failure conditions and error handling:
- * - Relayer pool failures
- * - Network unavailability
- * - Rate limiting
- * - Insufficient balance
+ * - Queue (SQS) failures
+ * - RPC unavailability
+ * - Input validation
+ * - Authentication
  * - Timeout scenarios
  */
 describe("Error Scenarios E2E Tests", () => {
@@ -39,13 +42,40 @@ describe("Error Scenarios E2E Tests", () => {
     resetMocks(app);
   });
 
-  describe("Relayer Pool Failures", () => {
-    it("TC-E2E-ERR001: should return 503 when OZ Relayer is completely unavailable", async () => {
-      // Given: OZ Relayer service throws ServiceUnavailableException
-      const ozMock = getOzRelayerServiceMock(app);
-      ozMock.sendTransaction.mockRejectedValueOnce(
-        new ServiceUnavailableException("All relayers are unavailable"),
-      );
+  describe("Queue (SQS) Failures", () => {
+    /**
+     * SPEC-QUEUE-001: Test queue failures in async architecture
+     * Direct TX now queues messages to SQS instead of calling OZ Relayer directly
+     * OZ Relayer errors are handled by queue-consumer, not relay-api
+     */
+
+    it("TC-E2E-ERR001: should return 503 when SQS queue is unavailable", async () => {
+      // Given: SQS adapter throws error
+      const sqsMock = getSqsAdapterMock(app);
+      sqsMock.sendMessage.mockRejectedValueOnce(new Error("SQS unavailable"));
+
+      const payload = {
+        to: TEST_ADDRESSES.merchant,
+        data: "0x00",
+        speed: "fast",
+      };
+
+      // When: Submit Direct TX request
+      const response = await request(app.getHttpServer())
+        .post("/api/v1/relay/direct")
+        .set("x-api-key", "test-api-key")
+        .send(payload);
+
+      // Then: Should return 503 Service Unavailable (queue failure)
+      expect(response.status).toBe(503);
+      expect(response.body).toHaveProperty("message");
+      expect(response.body.message).toContain("queue");
+    });
+
+    it("TC-E2E-ERR002: should return 503 when SQS responds with network error", async () => {
+      // Given: SQS throws network error
+      const sqsMock = getSqsAdapterMock(app);
+      sqsMock.sendMessage.mockRejectedValueOnce(new Error("ECONNREFUSED"));
 
       const payload = {
         to: TEST_ADDRESSES.merchant,
@@ -61,35 +91,12 @@ describe("Error Scenarios E2E Tests", () => {
 
       // Then: Should return 503 Service Unavailable
       expect(response.status).toBe(503);
-      expect(response.body).toHaveProperty("message");
-      expect(response.body.message).toContain("unavailable");
     });
 
-    it("TC-E2E-ERR002: should return 503 when relayer responds with network error", async () => {
-      // Given: OZ Relayer throws network error
-      const ozMock = getOzRelayerServiceMock(app);
-      ozMock.sendTransaction.mockRejectedValueOnce(new Error("ECONNREFUSED"));
-
-      const payload = {
-        to: TEST_ADDRESSES.merchant,
-        data: "0x00",
-        speed: "fast",
-      };
-
-      // When: Submit Direct TX request
-      const response = await request(app.getHttpServer())
-        .post("/api/v1/relay/direct")
-        .set("x-api-key", "test-api-key")
-        .send(payload);
-
-      // Then: Should return 503 or 500 depending on error handling
-      expect([500, 503]).toContain(response.status);
-    });
-
-    it("TC-E2E-ERR003: should handle timeout gracefully", async () => {
-      // Given: OZ Relayer times out (simulated with delayed rejection)
-      const ozMock = getOzRelayerServiceMock(app);
-      ozMock.sendTransaction.mockImplementationOnce(
+    it("TC-E2E-ERR003: should handle SQS timeout gracefully", async () => {
+      // Given: SQS times out (simulated with delayed rejection)
+      const sqsMock = getSqsAdapterMock(app);
+      sqsMock.sendMessage.mockImplementationOnce(
         () =>
           new Promise((_, reject) => {
             setTimeout(() => reject(new Error("Request timeout")), 100);
@@ -108,8 +115,8 @@ describe("Error Scenarios E2E Tests", () => {
         .set("x-api-key", "test-api-key")
         .send(payload);
 
-      // Then: Should return appropriate error status
-      expect([500, 503, 504]).toContain(response.status);
+      // Then: Should return 503 (queue failure)
+      expect(response.status).toBe(503);
     });
   });
 
@@ -241,12 +248,11 @@ describe("Error Scenarios E2E Tests", () => {
   });
 
   describe("Gasless TX Error Scenarios", () => {
-    it("TC-E2E-ERR011: should return 503 when Gasless service fails to submit", async () => {
-      // Given: Valid request but OZ Relayer fails
-      const ozMock = getOzRelayerServiceMock(app);
-      ozMock.sendTransaction.mockRejectedValueOnce(
-        new ServiceUnavailableException("Gasless submission failed"),
-      );
+    it("TC-E2E-ERR011: should return 503 when SQS queue fails for Gasless TX", async () => {
+      // Given: Valid request but SQS queue fails
+      // SPEC-QUEUE-001: Gasless TX now queues to SQS instead of calling OZ Relayer directly
+      const sqsMock = getSqsAdapterMock(app);
+      sqsMock.sendMessage.mockRejectedValueOnce(new Error("SQS unavailable"));
 
       const forwardRequest = createForwardRequest(
         TEST_ADDRESSES.user,
@@ -266,7 +272,7 @@ describe("Error Scenarios E2E Tests", () => {
         .set("x-api-key", "test-api-key")
         .send({ request: forwardRequest, signature });
 
-      // Then: Should return 503 Service Unavailable
+      // Then: Should return 503 Service Unavailable (queue failure)
       expect(response.status).toBe(503);
       expect(response.body).toHaveProperty("message");
     });

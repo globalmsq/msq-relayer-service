@@ -105,7 +105,7 @@ services:
       MYSQL_DATABASE: msq_relayer
     volumes:
       - msq-relayer-mysql-data:/var/lib/mysql
-      - ./init:/docker-entrypoint-initdb.d:ro
+      # Note: Schema initialization moved to relay-api entrypoint (prisma migrate deploy)
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-ppass"]
       interval: 10s

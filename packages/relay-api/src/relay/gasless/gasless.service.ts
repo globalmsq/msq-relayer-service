@@ -7,68 +7,60 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { HttpService } from "@nestjs/axios";
-import { Interface } from "ethers";
 import { SignatureVerifierService } from "./signature-verifier.service";
-import { OzRelayerService } from "../../oz-relayer/oz-relayer.service";
-import { PrismaService } from "../../prisma/prisma.service";
-import { RedisService } from "../../redis/redis.service";
+import { QueueService } from "../../queue/queue.service";
 import { GaslessTxRequestDto } from "../dto/gasless-tx-request.dto";
 import { GaslessTxResponseDto } from "../dto/gasless-tx-response.dto";
-import { DirectTxRequestDto } from "../dto/direct-tx-request.dto";
 
 /**
  * GaslessService - Gasless Transaction Orchestration
  *
  * SPEC-GASLESS-001: Gasless Transaction API
- * SPEC-WEBHOOK-001: TX History & Webhook System - Write-through caching
+ * SPEC-QUEUE-001: AWS SQS Queue System - Async Processing
  *
+ * Pre-validation (fail-fast before queuing):
  * - U-GASLESS-001: EIP-712 Signature Verification
  * - U-GASLESS-002: Deadline Validation
- * - U-GASLESS-003: Nonce Query API
+ * - T-GASLESS-005: Nonce Query and Validation
+ *
+ * After validation, transaction is queued for async processing.
+ * Consumer (queue-consumer) handles:
  * - U-GASLESS-004: Forwarder Transaction Build
- * - U-GASLESS-005: Response Format
- * - T-GASLESS-005: Nonce Types and Management
- * - T-GASLESS-006: RPC Integration
+ * - OZ Relayer submission
+ * - Status updates
  */
 @Injectable()
 export class GaslessService {
   private readonly logger = new Logger(GaslessService.name);
-  private readonly CACHE_TTL_SECONDS = 600; // 10 minutes
-
-  // ERC2771Forwarder contract ABI for nonces() and execute()
-  // OpenZeppelin v5 uses ForwardRequestData struct with signature inside
-  private forwarderInterface = new Interface([
-    "function nonces(address from) view returns (uint256)",
-    "function execute((address from, address to, uint256 value, uint256 gas, uint48 deadline, bytes data, bytes signature) request)",
-  ]);
 
   constructor(
     private readonly signatureVerifier: SignatureVerifierService,
-    private readonly ozRelayerService: OzRelayerService,
+    private readonly queueService: QueueService,
     private readonly configService: ConfigService,
     private readonly httpService: HttpService,
-    private readonly prismaService: PrismaService,
-    private readonly redisService: RedisService,
   ) {}
 
   /**
-   * Send gasless transaction via ERC2771Forwarder
+   * Validate and queue gasless transaction for processing
    *
    * Complete workflow:
    * 1. Validate deadline is in the future
    * 2. Query expected nonce from Forwarder contract
    * 3. Validate request.nonce matches expected nonce (pre-check)
    * 4. Verify EIP-712 signature
-   * 5. Build Forwarder.execute() transaction
-   * 6. Submit to OZ Relayer
-   * 7. Store transaction in Redis + MySQL (Write-through)
-   * 8. Return transaction response
+   * 5. Queue transaction for async processing
+   * 6. Return 202 Accepted with transactionId
+   *
+   * Consumer (queue-consumer) will:
+   * - Build Forwarder.execute() transaction
+   * - Call OZ Relayer
+   * - Update transaction status
    *
    * @param dto - Validated GaslessTxRequestDto
-   * @returns GaslessTxResponseDto with transaction details
+   * @returns GaslessTxResponseDto with transactionId and status="queued"
    * @throws BadRequestException if deadline expired or nonce mismatch
    * @throws UnauthorizedException if signature invalid
-   * @throws ServiceUnavailableException if RPC or OZ Relayer unavailable
+   * @throws ServiceUnavailableException if RPC or queue service unavailable
    */
   async sendGaslessTransaction(
     dto: GaslessTxRequestDto,
@@ -94,74 +86,20 @@ export class GaslessService {
       throw new UnauthorizedException("Invalid EIP-712 signature");
     }
 
-    // Step 5: Build Forwarder.execute() transaction
-    const forwarderTx = this.buildForwarderExecuteTx(dto);
+    // Step 5: Queue transaction for async processing
+    const forwarderAddress =
+      this.configService.get<string>("FORWARDER_ADDRESS");
 
-    // Step 6: Submit to OZ Relayer
-    try {
-      const response = await this.ozRelayerService.sendTransaction(forwarderTx);
-
-      this.logger.log(
-        `Gasless transaction submitted: txId=${response.transactionId}, from=${dto.request.from}`,
-      );
-
-      const result: GaslessTxResponseDto = {
-        transactionId: response.transactionId,
-        hash: response.hash,
-        status: response.status,
-        createdAt: response.createdAt,
-      };
-
-      // Step 7: Store in Redis + MySQL (Write-through)
-      const forwarderAddress =
-        this.configService.get<string>("FORWARDER_ADDRESS");
-      const cacheKey = `tx:status:${response.transactionId}`;
-      const cacheData = {
-        transactionId: response.transactionId,
-        hash: response.hash,
-        status: response.status,
-        createdAt: response.createdAt,
-        from: dto.request.from,
-        to: forwarderAddress,
-        value: "0",
-      };
-
-      try {
-        await Promise.all([
-          this.redisService.set(cacheKey, cacheData, this.CACHE_TTL_SECONDS),
-          this.prismaService.transaction.create({
-            data: {
-              id: response.transactionId,
-              hash: response.hash,
-              status: response.status,
-              from: dto.request.from,
-              to: forwarderAddress,
-              value: "0",
-              data: dto.request.data,
-              createdAt: new Date(response.createdAt),
-            },
-          }),
-        ]);
-
-        this.logger.log(
-          `Gasless transaction stored: txId=${response.transactionId}, from=${dto.request.from}`,
-        );
-      } catch (storageError) {
-        // Log but don't fail the request - OZ Relayer already accepted it
-        this.logger.error(
-          `Failed to store gasless transaction ${response.transactionId}: ${storageError.message}`,
-        );
-      }
-
-      // Step 8: Return transaction response
-      return result;
-    } catch (error) {
-      this.logger.error(
-        `OZ Relayer error for address ${dto.request.from}: ${error instanceof Error ? error.message : "Unknown error"}`,
-        error instanceof Error ? error.stack : undefined,
-      );
-      throw new ServiceUnavailableException("OZ Relayer service unavailable");
+    if (!forwarderAddress) {
+      throw new Error("FORWARDER_ADDRESS not configured");
     }
+
+    this.logger.log(
+      `Queuing gasless transaction: from=${dto.request.from}, forwarder=${forwarderAddress}`,
+    );
+
+    // Step 6: Return 202 Accepted with transactionId
+    return this.queueService.sendGaslessTransaction(dto, forwarderAddress);
   }
 
   /**
@@ -246,65 +184,5 @@ export class GaslessService {
         `Invalid nonce: expected ${expectedNonce}, got ${requestNonce}`,
       );
     }
-  }
-
-  /**
-   * Build Forwarder.execute() transaction
-   *
-   * Encodes the ERC2771Forwarder.execute(request, signature) call
-   * The execute function takes a ForwardRequest struct and signature
-   *
-   * Function signature (OpenZeppelin v5):
-   * execute((address from, address to, uint256 value, uint256 gas, uint48 deadline, bytes data, bytes signature) request)
-   *
-   * Note: Signature is INSIDE the ForwardRequestData struct, not a separate parameter.
-   * Nonce is used for EIP-712 signing but NOT included in the calldata.
-   *
-   * Returns: DirectTxRequestDto to be sent to OZ Relayer
-   *
-   * @param dto - GaslessTxRequestDto with request and signature
-   * @returns DirectTxRequestDto with encoded Forwarder call
-   */
-  private buildForwarderExecuteTx(
-    dto: GaslessTxRequestDto,
-  ): DirectTxRequestDto {
-    const forwarderAddress =
-      this.configService.get<string>("FORWARDER_ADDRESS");
-
-    if (!forwarderAddress) {
-      throw new Error("FORWARDER_ADDRESS not configured");
-    }
-
-    // Build ForwardRequestData struct (OpenZeppelin v5 format)
-    // Order: from, to, value, gas, deadline, data, signature
-    // Note: nonce is NOT in the struct - only used for EIP-712 signing
-    const forwardRequestData = [
-      dto.request.from,
-      dto.request.to,
-      dto.request.value,
-      dto.request.gas,
-      dto.request.deadline,
-      dto.request.data,
-      dto.signature,
-    ];
-
-    // Encode execute(request) call - signature is inside the struct
-    const callData = this.forwarderInterface.encodeFunctionData("execute", [
-      forwardRequestData,
-    ]);
-
-    // Get gas limit from config (default: 200000 for Forwarder.execute() + inner call)
-    const gasLimit = this.configService.get<string>(
-      "FORWARDER_GAS_LIMIT",
-      "200000",
-    );
-
-    return {
-      to: forwarderAddress,
-      data: callData,
-      value: "0", // Forwarder itself doesn't receive value
-      gasLimit,
-      speed: "fast", // Default speed
-    };
   }
 }

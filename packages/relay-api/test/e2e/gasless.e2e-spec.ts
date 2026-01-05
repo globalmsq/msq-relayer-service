@@ -4,6 +4,7 @@ import {
   createTestApp,
   getOzRelayerServiceMock,
   getGaslessServiceMock,
+  getSqsAdapterMock,
   resetMocks,
 } from "../utils/test-app.factory";
 import { TEST_WALLETS, TEST_ADDRESSES } from "../fixtures/test-wallets";
@@ -241,12 +242,15 @@ describe("Gasless Transaction E2E Tests", () => {
   });
 
   describe("Service unavailability", () => {
-    it("TC-E2E-G011: should return 503 when OZ Relayer unavailable", async () => {
-      // Given: OZ Relayer service is unavailable
-      const ozRelayerMock = getOzRelayerServiceMock(app);
-      ozRelayerMock.sendTransaction.mockRejectedValueOnce(
-        new ServiceUnavailableException("OZ Relayer service unavailable"),
-      );
+    /**
+     * SPEC-QUEUE-001: Updated for queue-based architecture
+     * Gasless TX now queues to SQS instead of calling OZ Relayer directly
+     * OZ Relayer errors are handled by queue-consumer, not relay-api
+     */
+    it("TC-E2E-G011: should return 503 when SQS queue unavailable", async () => {
+      // Given: SQS queue is unavailable
+      const sqsMock = getSqsAdapterMock(app);
+      sqsMock.sendMessage.mockRejectedValueOnce(new Error("SQS unavailable"));
 
       const forwardRequest = createForwardRequest(
         TEST_ADDRESSES.user,
@@ -264,7 +268,7 @@ describe("Gasless Transaction E2E Tests", () => {
         .set("x-api-key", "test-api-key")
         .send({ request: forwardRequest, signature });
 
-      // Then: Should return 503 Service Unavailable
+      // Then: Should return 503 Service Unavailable (queue failure)
       expect(response.status).toBe(503);
       expect(response.body).toHaveProperty("message");
     });

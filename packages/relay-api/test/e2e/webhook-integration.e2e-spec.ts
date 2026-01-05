@@ -10,6 +10,7 @@ import {
   defaultRedisMock,
   getOzRelayerServiceMock,
   getHttpServiceMock,
+  getSqsAdapterMock,
 } from "../utils/test-app.factory";
 import { TEST_CONFIG } from "../fixtures/test-config";
 import { TEST_WALLETS } from "../fixtures/test-wallets";
@@ -133,8 +134,11 @@ describe("Webhook Integration E2E Tests", () => {
   /**
    * Scenario 1: Transaction Creation + Storage
    * AC-1.1: Transaction created via /relay/direct is stored in both Redis and MySQL
+   *
+   * SPEC-QUEUE-001: Updated for queue-based architecture
+   * DirectService now queues to SQS via QueueService instead of calling OZ Relayer directly
    */
-  it("TC-E2E-INT001: Transaction creation stores in both Redis and MySQL", async () => {
+  it("TC-E2E-INT001: Transaction creation stores in MySQL and queues to SQS", async () => {
     // Given: Valid direct relay request
     const payload = {
       to: TEST_WALLETS.merchant.address,
@@ -142,43 +146,41 @@ describe("Webhook Integration E2E Tests", () => {
       value: "1000000000000000000", // 1 ETH
     };
 
-    const ozMock = getOzRelayerServiceMock(app);
-    ozMock.sendTransaction.mockResolvedValueOnce({
-      transactionId: "test-tx-123",
-      hash: null,
-      status: "pending",
-      createdAt: new Date().toISOString(),
-    });
-
     // When: POST /api/v1/relay/direct
     const response = await request(app.getHttpServer())
       .post("/api/v1/relay/direct")
       .set("x-api-key", TEST_CONFIG.api.key)
       .send(payload);
 
-    // Then: Verify Redis + MySQL storage
+    // Then: Verify 202 Accepted with transactionId (UUID format from Prisma)
     expect(response.status).toBe(202);
-    expect(response.body.transactionId).toBe("test-tx-123");
-
-    // Verify Redis set with TTL 600s
-    expect(defaultRedisMock.set).toHaveBeenCalledWith(
-      "tx:status:test-tx-123",
-      expect.objectContaining({
-        transactionId: "test-tx-123",
-        status: "pending",
-      }),
-      600,
+    expect(response.body.transactionId).toBeDefined();
+    expect(response.body.transactionId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
     );
 
-    // Verify MySQL create
+    const transactionId = response.body.transactionId;
+
+    // Verify MySQL create (SPEC-QUEUE-001: DB record created first)
     expect(defaultPrismaMock.transaction.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        id: "test-tx-123",
-        status: "pending",
+        status: "queued", // SPEC-QUEUE-001: Initial status is "queued"
         to: payload.to,
         value: payload.value,
       }),
     });
+
+    // Verify SQS queue (SPEC-QUEUE-001: Message queued to SQS)
+    const sqsMock = getSqsAdapterMock(app);
+    expect(sqsMock.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "direct",
+        transactionId: transactionId,
+        request: expect.objectContaining({
+          to: payload.to,
+        }),
+      }),
+    );
   });
 
   /**
@@ -494,18 +496,14 @@ describe("Webhook Integration E2E Tests", () => {
       .get(`/api/v1/relay/status/${txId}`)
       .set("x-api-key", TEST_CONFIG.api.key);
 
-    // Then: Verify graceful degradation (currently returns 500 due to unhandled MySQL error)
-    // NOTE: This is a known issue - MySQL errors should be caught and fallback to OZ Relayer
-    // TODO: Update StatusService to handle MySQL exceptions and fallback to OZ Relayer
-    expect(response.status).toBe(500);
-
-    // Once MySQL exception handling is implemented, this test should expect:
-    // expect(response.status).toBe(200);
-    // expect(response.body.transactionId).toBe(txId);
-    // expect(httpMock.get).toHaveBeenCalledWith(
-    //   expect.stringContaining(`/transactions/${txId}`),
-    //   expect.any(Object),
-    // );
+    // Then: Verify graceful degradation to OZ Relayer
+    // SPEC-WEBHOOK-001: StatusService now properly handles MySQL exceptions and falls back to OZ Relayer
+    expect(response.status).toBe(200);
+    expect(response.body.transactionId).toBe(txId);
+    expect(httpMock.get).toHaveBeenCalledWith(
+      expect.stringContaining(`/transactions/${txId}`),
+      expect.any(Object),
+    );
   });
 
   /**

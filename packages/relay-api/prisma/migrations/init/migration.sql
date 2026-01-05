@@ -7,6 +7,10 @@ CREATE TABLE `transactions` (
     `to` VARCHAR(191) NULL,
     `value` VARCHAR(191) NULL,
     `data` LONGTEXT NULL,
+    `type` VARCHAR(191) NULL,
+    `request` JSON NULL,
+    `result` JSON NULL,
+    `error_message` LONGTEXT NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
     `confirmedAt` DATETIME(3) NULL,
@@ -14,6 +18,7 @@ CREATE TABLE `transactions` (
     UNIQUE INDEX `transactions_hash_key`(`hash`),
     INDEX `transactions_status_idx`(`status`),
     INDEX `transactions_hash_idx`(`hash`),
+    INDEX `transactions_type_idx`(`type`),
     INDEX `transactions_createdAt_idx`(`createdAt`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

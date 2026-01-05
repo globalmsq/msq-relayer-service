@@ -2,7 +2,11 @@ import { Controller, Get, HttpCode, HttpStatus } from "@nestjs/common";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { HealthCheck, HealthCheckService } from "@nestjs/terminus";
 import { Public } from "../auth/decorators/public.decorator";
-import { OzRelayerHealthIndicator, RedisHealthIndicator } from "./indicators";
+import {
+  OzRelayerHealthIndicator,
+  RedisHealthIndicator,
+  SqsHealthIndicator,
+} from "./indicators";
 
 @Controller()
 @ApiTags("Health")
@@ -11,6 +15,7 @@ export class HealthController {
     private readonly health: HealthCheckService,
     private readonly ozRelayerHealth: OzRelayerHealthIndicator,
     private readonly redisHealth: RedisHealthIndicator,
+    private readonly sqsHealth: SqsHealthIndicator,
   ) {}
 
   /**
@@ -109,6 +114,7 @@ export class HealthController {
     return this.health.check([
       () => this.ozRelayerHealth.isHealthy("oz-relayer-pool"),
       () => this.redisHealth.isHealthy("redis"),
+      () => this.sqsHealth.isHealthy("sqs"),
     ]);
   }
 

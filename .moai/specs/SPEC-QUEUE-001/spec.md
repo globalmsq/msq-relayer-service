@@ -1,9 +1,9 @@
 ---
 id: SPEC-QUEUE-001
 version: "1.0.0"
-status: "draft"
+status: "completed"
 created: "2026-01-04"
-updated: "2026-01-04"
+updated: "2026-01-05"
 author: "@user"
 priority: "high"
 ---

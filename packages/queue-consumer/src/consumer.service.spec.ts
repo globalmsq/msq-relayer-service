@@ -26,7 +26,9 @@ describe('ConsumerService (RED Phase - Failing Tests)', () => {
         {
           provide: OzRelayerClient,
           useValue: {
-            sendToOzRelayer: jest.fn(),
+            sendDirectTransaction: jest.fn(),
+            sendGaslessTransaction: jest.fn(),
+            sendToOzRelayer: jest.fn(), // Legacy method for compatibility
           },
         },
         {
@@ -42,8 +44,12 @@ describe('ConsumerService (RED Phase - Failing Tests)', () => {
           provide: ConfigService,
           useValue: {
             get: jest.fn((key: string) => {
-              const config = {
+              const config: Record<string, string | object> = {
                 SQS_QUEUE_URL: 'http://localhost:4566/000000000000/relay-transactions',
+                consumer: {
+                  waitTimeSeconds: 20,
+                  maxNumberOfMessages: 10,
+                },
               };
               return config[key];
             }),
@@ -98,12 +104,12 @@ describe('ConsumerService (RED Phase - Failing Tests)', () => {
 
       jest.spyOn(sqsAdapter, 'receiveMessages').mockResolvedValue([mockMessage]);
       jest
-        .spyOn(relayerClient, 'sendToOzRelayer')
+        .spyOn(relayerClient, 'sendDirectTransaction')
         .mockResolvedValue({ txHash: '0xabc123' });
 
       await service.processMessages();
 
-      expect(relayerClient.sendToOzRelayer).toHaveBeenCalled();
+      expect(relayerClient.sendDirectTransaction).toHaveBeenCalled();
     });
 
     it('should delete message from SQS on successful processing', async () => {
@@ -119,7 +125,7 @@ describe('ConsumerService (RED Phase - Failing Tests)', () => {
 
       jest.spyOn(sqsAdapter, 'receiveMessages').mockResolvedValue([mockMessage]);
       jest
-        .spyOn(relayerClient, 'sendToOzRelayer')
+        .spyOn(relayerClient, 'sendDirectTransaction')
         .mockResolvedValue({ txHash: '0xabc123' });
 
       await service.processMessages();
@@ -141,7 +147,7 @@ describe('ConsumerService (RED Phase - Failing Tests)', () => {
 
       jest.spyOn(sqsAdapter, 'receiveMessages').mockResolvedValue([mockMessage]);
       jest
-        .spyOn(relayerClient, 'sendToOzRelayer')
+        .spyOn(relayerClient, 'sendDirectTransaction')
         .mockResolvedValue({ txHash: '0xabc123' });
 
       await service.processMessages();
@@ -149,7 +155,7 @@ describe('ConsumerService (RED Phase - Failing Tests)', () => {
       expect(prisma.transaction.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: transactionId },
-          data: expect.objectContaining({ status: 'success' }),
+          data: expect.objectContaining({ status: 'confirmed', hash: '0xabc123' }),
         }),
       );
     });
@@ -169,7 +175,7 @@ describe('ConsumerService (RED Phase - Failing Tests)', () => {
       // Transaction already processed
       jest.spyOn(prisma.transaction, 'findUnique').mockResolvedValue({
         id: transactionId,
-        status: 'success',
+        status: 'confirmed',
       } as any);
 
       jest.spyOn(sqsAdapter, 'receiveMessages').mockResolvedValue([mockMessage]);
@@ -178,7 +184,7 @@ describe('ConsumerService (RED Phase - Failing Tests)', () => {
 
       // Should delete message without re-processing
       expect(sqsAdapter.deleteMessage).toHaveBeenCalled();
-      expect(relayerClient.sendToOzRelayer).not.toHaveBeenCalled();
+      expect(relayerClient.sendDirectTransaction).not.toHaveBeenCalled();
     });
 
     it('should handle OZ Relayer errors and retry', async () => {
@@ -194,7 +200,7 @@ describe('ConsumerService (RED Phase - Failing Tests)', () => {
 
       jest.spyOn(sqsAdapter, 'receiveMessages').mockResolvedValue([mockMessage]);
       jest
-        .spyOn(relayerClient, 'sendToOzRelayer')
+        .spyOn(relayerClient, 'sendDirectTransaction')
         .mockRejectedValue(new Error('OZ Relayer unavailable'));
 
       // Should not throw, message should be returned to queue

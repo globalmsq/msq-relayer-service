@@ -9,6 +9,41 @@ import { SqsAdapter } from './sqs/sqs.adapter';
 import { OzRelayerClient } from './relay/oz-relayer.client';
 import { PrismaService } from './prisma/prisma.service';
 
+/**
+ * Queue Message Types
+ */
+interface DirectMessage {
+  transactionId: string;
+  type: 'direct';
+  request: {
+    to: string;
+    data: string;
+    value?: string;
+    gasLimit?: string;
+    speed?: string;
+  };
+}
+
+interface GaslessMessage {
+  transactionId: string;
+  type: 'gasless';
+  request: {
+    request: {
+      from: string;
+      to: string;
+      value: string;
+      gas: string;
+      nonce: string;
+      deadline: string;
+      data: string;
+    };
+    signature: string;
+  };
+  forwarderAddress: string;
+}
+
+type QueueMessage = DirectMessage | GaslessMessage;
+
 @Injectable()
 export class ConsumerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(ConsumerService.name);
@@ -49,14 +84,14 @@ export class ConsumerService implements OnModuleInit, OnModuleDestroy {
     if (!this.isShuttingDown) {
       this.processMessages().catch((error: unknown) => {
         const err = error as Error;
-        this.logger.error(`Error in message processing: ${err.message}`, err.stack);
+        this.logger.error(
+          `Error in message processing: ${err.message}`,
+          err.stack,
+        );
       });
 
       // Schedule next processing cycle after waiting
-      this.processingTimeout = setTimeout(
-        () => this.startProcessing(),
-        1000,
-      );
+      this.processingTimeout = setTimeout(() => this.startProcessing(), 1000);
     }
   }
 
@@ -94,8 +129,8 @@ export class ConsumerService implements OnModuleInit, OnModuleDestroy {
     const { MessageId, Body, ReceiptHandle } = message;
 
     try {
-      const messageBody = JSON.parse(Body);
-      const { transactionId, type, request } = messageBody;
+      const messageBody: QueueMessage = JSON.parse(Body);
+      const { transactionId, type } = messageBody;
 
       this.logger.log(`Processing message: ${transactionId} (${type})`);
 
@@ -104,7 +139,7 @@ export class ConsumerService implements OnModuleInit, OnModuleDestroy {
         where: { id: transactionId },
       });
 
-      if (transaction && ['success', 'failed'].includes(transaction.status)) {
+      if (transaction && ['confirmed', 'failed'].includes(transaction.status)) {
         this.logger.log(
           `Transaction already in terminal state: ${transaction.status}, deleting message`,
         );
@@ -112,14 +147,30 @@ export class ConsumerService implements OnModuleInit, OnModuleDestroy {
         return;
       }
 
-      // Send to OZ Relayer
-      const result = await this.relayerClient.sendToOzRelayer(request);
+      // Send to OZ Relayer based on transaction type
+      let result: any;
 
-      // Update transaction status to success
+      if (type === 'direct') {
+        const directMessage = messageBody as DirectMessage;
+        result = await this.relayerClient.sendDirectTransaction(
+          directMessage.request,
+        );
+      } else if (type === 'gasless') {
+        const gaslessMessage = messageBody as GaslessMessage;
+        result = await this.relayerClient.sendGaslessTransaction(
+          gaslessMessage.request,
+          gaslessMessage.forwarderAddress,
+        );
+      } else {
+        throw new Error(`Unknown transaction type: ${type}`);
+      }
+
+      // Update transaction status to confirmed with hash from OZ Relayer
       await this.prisma.transaction.update({
         where: { id: transactionId },
         data: {
-          status: 'success',
+          status: 'confirmed',
+          hash: result.txHash, // Store actual tx hash in hash column
           result,
         },
       });

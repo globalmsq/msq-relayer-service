@@ -1,3 +1,12 @@
+// Set environment variables BEFORE any module imports
+// This is critical for SqsAdapter which validates env vars in constructor
+process.env.SQS_QUEUE_URL = "http://localhost:4566/000000000000/relay-transactions";
+process.env.SQS_DLQ_URL = "http://localhost:4566/000000000000/relay-transactions-dlq";
+process.env.SQS_ENDPOINT_URL = "http://localhost:4566";
+process.env.AWS_REGION = "ap-northeast-2";
+process.env.AWS_ACCESS_KEY_ID = "test";
+process.env.AWS_SECRET_ACCESS_KEY = "test";
+
 import { Test, TestingModule } from "@nestjs/testing";
 import { INestApplication, ValidationPipe } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -9,6 +18,7 @@ import { GaslessService } from "../../src/relay/gasless/gasless.service";
 import { StatusModule } from "../../src/relay/status/status.module";
 import { RedisService } from "../../src/redis/redis.service";
 import { PrismaService } from "../../src/prisma/prisma.service";
+import { SqsAdapter } from "../../src/queue/sqs.adapter";
 import { TEST_CONFIG } from "../fixtures/test-config";
 import {
   createMockOzRelayerResponse,
@@ -27,6 +37,20 @@ const configMap: Record<string, any> = {
   RPC_URL: "http://localhost:8545",
   WEBHOOK_SIGNING_KEY: TEST_CONFIG.webhook.signing_key,
   CLIENT_WEBHOOK_URL: TEST_CONFIG.webhook.client_url,
+  // SQS Configuration (SPEC-QUEUE-001)
+  SQS_QUEUE_URL: "http://localhost:4566/000000000000/relay-transactions",
+  SQS_DLQ_URL: "http://localhost:4566/000000000000/relay-transactions-dlq",
+  SQS_ENDPOINT_URL: "http://localhost:4566",
+  AWS_REGION: "ap-northeast-2",
+  AWS_ACCESS_KEY_ID: "test",
+  AWS_SECRET_ACCESS_KEY: "test",
+  // SQS nested config keys (for ConfigService.get())
+  "sqs.endpoint": "http://localhost:4566",
+  "sqs.queueUrl": "http://localhost:4566/000000000000/relay-transactions",
+  "sqs.dlqUrl": "http://localhost:4566/000000000000/relay-transactions-dlq",
+  "sqs.region": "ap-northeast-2",
+  "sqs.accessKeyId": "test",
+  "sqs.secretAccessKey": "test",
 };
 
 // Default mock for OzRelayerService
@@ -64,22 +88,30 @@ export const defaultRedisMock = {
   onModuleDestroy: jest.fn().mockResolvedValue(undefined),
 };
 
+// UUID generator for unique transaction IDs
+let transactionCounter = 0;
+const generateMockTransactionId = () => {
+  transactionCounter++;
+  return `00000000-0000-0000-0000-${String(transactionCounter).padStart(12, "0")}`;
+};
+
 // Default mock transaction data for Prisma
 const createMockTransaction = (overrides = {}) => ({
-  id: "test-tx-id",
+  id: generateMockTransactionId(),
   hash: "0x" + "1".repeat(64),
-  status: "confirmed",
+  status: "queued", // SPEC-QUEUE-001: Default status is now "queued"
   from: "0x" + "a".repeat(40),
   to: "0x" + "b".repeat(40),
   value: "1000000000000000000",
   data: null,
   createdAt: new Date(),
   updatedAt: new Date(),
-  confirmedAt: new Date(),
+  confirmedAt: null,
   ...overrides,
 });
 
 // Default mock for PrismaService (L2 Cache / MySQL)
+// Use mockImplementation to generate unique transaction IDs per call
 export const defaultPrismaMock = {
   $connect: jest.fn().mockResolvedValue(undefined),
   $disconnect: jest.fn().mockResolvedValue(undefined),
@@ -88,11 +120,16 @@ export const defaultPrismaMock = {
   transaction: {
     findUnique: jest.fn().mockResolvedValue(null),
     findMany: jest.fn().mockResolvedValue([]),
-    create: jest.fn().mockResolvedValue(createMockTransaction()),
-    update: jest.fn().mockResolvedValue(createMockTransaction()),
-    upsert: jest.fn().mockResolvedValue(createMockTransaction()),
-    delete: jest.fn().mockResolvedValue(createMockTransaction()),
+    create: jest.fn().mockImplementation(() => Promise.resolve(createMockTransaction())),
+    update: jest.fn().mockImplementation(() => Promise.resolve(createMockTransaction())),
+    upsert: jest.fn().mockImplementation(() => Promise.resolve(createMockTransaction())),
+    delete: jest.fn().mockImplementation(() => Promise.resolve(createMockTransaction())),
   },
+};
+
+// Default mock for SqsAdapter (SPEC-QUEUE-001: Queue Producer)
+export const defaultSqsAdapterMock = {
+  sendMessage: jest.fn().mockResolvedValue(undefined),
 };
 
 // Default mock for HttpService (for RPC calls in GaslessService)
@@ -166,6 +203,9 @@ export async function createTestApp(): Promise<INestApplication> {
     // Mock PrismaService (L2 Cache / MySQL) - Critical: prevents real DB connections
     .overrideProvider(PrismaService)
     .useValue(defaultPrismaMock)
+    // Mock SqsAdapter (SPEC-QUEUE-001) - Critical: prevents real SQS connections
+    .overrideProvider(SqsAdapter)
+    .useValue(defaultSqsAdapterMock)
     .compile();
 
   // Store for module-scoped access
@@ -308,11 +348,27 @@ export function getGaslessServiceMock(
 }
 
 /**
+ * Helper to get SqsAdapter mock for queue failure simulation
+ * Returns the mocked SqsAdapter
+ * @example
+ * const sqsMock = getSqsAdapterMock(app);
+ * sqsMock.sendMessage.mockRejectedValueOnce(new Error('SQS unavailable'));
+ */
+export function getSqsAdapterMock(
+  app: INestApplication,
+): jest.Mocked<SqsAdapter> {
+  return app.get(SqsAdapter) as jest.Mocked<SqsAdapter>;
+}
+
+/**
  * Reset all mocks between tests
  * Uses mockReset() to clear both call history AND queued implementations
  * @param app - Optional app instance to reset service spies
  */
 export function resetMocks(app?: INestApplication): void {
+  // Reset transaction counter for unique IDs
+  transactionCounter = 0;
+
   // Reset OzRelayerService mocks with fresh implementations
   defaultOzRelayerMock.sendTransaction.mockReset();
   defaultOzRelayerMock.getTransactionStatus.mockReset();
@@ -326,6 +382,22 @@ export function resetMocks(app?: INestApplication): void {
     Promise.resolve(createMockConfirmedResponse()),
   );
   defaultOzRelayerMock.getRelayerId.mockResolvedValue("test-relayer-id");
+
+  // Reset SqsAdapter mock (SPEC-QUEUE-001)
+  defaultSqsAdapterMock.sendMessage.mockReset();
+  defaultSqsAdapterMock.sendMessage.mockResolvedValue(undefined);
+
+  // Reset Prisma mocks with fresh implementation
+  defaultPrismaMock.transaction.create.mockReset();
+  defaultPrismaMock.transaction.create.mockImplementation(() =>
+    Promise.resolve(createMockTransaction()),
+  );
+  defaultPrismaMock.transaction.update.mockReset();
+  defaultPrismaMock.transaction.update.mockImplementation(() =>
+    Promise.resolve(createMockTransaction()),
+  );
+  defaultPrismaMock.transaction.findUnique.mockReset();
+  defaultPrismaMock.transaction.findUnique.mockResolvedValue(null);
 
   // Reset GaslessService spy
   if (gaslessServiceSpy) {

@@ -9,7 +9,11 @@ import {
 import { ServiceUnavailableException } from "@nestjs/common";
 import { of, throwError } from "rxjs";
 import { HealthController } from "./health.controller";
-import { OzRelayerHealthIndicator, RedisHealthIndicator } from "./indicators";
+import {
+  OzRelayerHealthIndicator,
+  RedisHealthIndicator,
+  SqsHealthIndicator,
+} from "./indicators";
 import { RedisService } from "../redis/redis.service";
 
 describe("HealthController (Integration)", () => {
@@ -17,15 +21,27 @@ describe("HealthController (Integration)", () => {
   let healthCheckService: HealthCheckService;
   let ozRelayerHealth: OzRelayerHealthIndicator;
   let redisHealth: RedisHealthIndicator;
+  let sqsHealth: SqsHealthIndicator;
   let httpService: HttpService;
 
+  // Mock SQS client send function
+  const mockSqsSend = jest.fn();
+
   beforeEach(async () => {
+    mockSqsSend.mockResolvedValue({
+      Attributes: {
+        ApproximateNumberOfMessages: "0",
+        ApproximateNumberOfMessagesNotVisible: "0",
+      },
+    });
+
     const module: TestingModule = await Test.createTestingModule({
       imports: [TerminusModule],
       controllers: [HealthController],
       providers: [
         OzRelayerHealthIndicator,
         RedisHealthIndicator,
+        SqsHealthIndicator,
         {
           provide: RedisService,
           useValue: {
@@ -45,12 +61,31 @@ describe("HealthController (Integration)", () => {
               if (key === "OZ_RELAYER_URL") {
                 return defaultValue || "http://oz-relayer-lb:8080";
               }
+              if (key === "sqs.endpoint") {
+                return "http://localhost:4566";
+              }
+              if (key === "sqs.queueUrl") {
+                return "http://localhost:4566/000000000000/test-queue";
+              }
+              if (key === "sqs.region") {
+                return "ap-northeast-2";
+              }
+              if (key === "sqs.accessKeyId") {
+                return "test";
+              }
+              if (key === "sqs.secretAccessKey") {
+                return "test";
+              }
               return defaultValue;
             }),
           },
         },
       ],
     }).compile();
+
+    // Replace SQS client's send method with mock
+    sqsHealth = module.get<SqsHealthIndicator>(SqsHealthIndicator);
+    (sqsHealth as any).client = { send: mockSqsSend };
 
     controller = module.get<HealthController>(HealthController);
     healthCheckService = module.get<HealthCheckService>(HealthCheckService);

@@ -5,22 +5,21 @@
     "lib": ["ES2021"],
     "declaration": true,
     "outDir": "./dist",
-    "rootDir": "./src",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
     "baseUrl": "./",
     "paths": {
       "@/*": ["src/*"]
     },
-    "typeRoots": ["../../node_modules/@types"],
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
     "allowSyntheticDefaultImports": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "test", "**/*spec.ts"]
+  "exclude": ["node_modules", "dist"]
 }
