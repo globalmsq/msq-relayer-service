@@ -112,6 +112,33 @@ ENV CHAIN_ID=31337
 CMD ["pnpm", "run", "deploy:local"]
 
 # ============================================================================
+# QUEUE-CONSUMER TARGET: SQS Consumer Service (SPEC-QUEUE-001)
+# ============================================================================
+FROM base AS queue-consumer
+
+# Copy queue-consumer source
+COPY packages/queue-consumer ./packages/queue-consumer
+
+# Copy relay-api for Prisma schema and types
+COPY packages/relay-api ./packages/relay-api
+
+# Set working directory
+WORKDIR /app/packages/queue-consumer
+
+# Install package-specific dependencies
+RUN pnpm install
+
+# Expose port (if health check needed)
+EXPOSE 3001
+
+# Health check (check SQS connectivity)
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=15s \
+    CMD curl -f http://localhost:3001/health || exit 1
+
+# Start consumer
+CMD ["pnpm", "run", "start"]
+
+# ============================================================================
 # INTEGRATION-TESTS TARGET: Jest integration test runner
 # ============================================================================
 FROM base AS integration-tests

@@ -122,6 +122,10 @@ describe("StatusService", () => {
         to: "0xContract456...",
         value: "1000000000000000000",
         data: null,
+        type: "direct",
+        request: null,
+        result: null,
+        error_message: null,
       };
 
       jest.spyOn(redisService, "get").mockResolvedValueOnce(null);

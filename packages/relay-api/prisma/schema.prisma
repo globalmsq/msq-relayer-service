@@ -18,12 +18,20 @@ model Transaction {
   to            String?
   value         String?
   data          String?   @db.Text
+
+  // SPEC-QUEUE-001: SQS Queue System Fields
+  type          String?   // 'direct' | 'gasless'
+  request       Json?     // Original request data (DirectTxRequestDto, GaslessTxRequestDto)
+  result        Json?     // OZ Relayer response (hash, transactionId, etc.)
+  error_message String?   @db.Text // Error message on failure
+
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   confirmedAt   DateTime?
 
   @@index([status])
   @@index([hash])
+  @@index([type])
   @@index([createdAt])
   @@map("transactions")
 }
