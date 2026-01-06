@@ -22,6 +22,11 @@ export default () => ({
   relayer: {
     url: process.env.OZ_RELAYER_URL || 'http://localhost:8081',
     apiKey: process.env.OZ_RELAYER_API_KEY || 'oz-relayer-shared-api-key-local-dev',
+    // Polling configuration for transaction confirmation
+    polling: {
+      maxAttempts: parseInt(process.env.RELAYER_POLLING_MAX_ATTEMPTS || '30', 10),
+      delayMs: parseInt(process.env.RELAYER_POLLING_DELAY_MS || '500', 10),
+    },
   },
 
   consumer: {

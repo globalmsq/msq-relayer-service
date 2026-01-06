@@ -80,13 +80,23 @@ export class QueueService {
         const err = sqsError as Error;
         this.logger.error(`SQS send failed for txId=${transactionId}: ${err.message}`);
 
-        await this.prisma.transaction.update({
-          where: { id: transactionId },
-          data: {
-            status: 'failed',
-            error_message: err.message,
-          },
-        });
+        try {
+          await this.prisma.transaction.update({
+            where: { id: transactionId },
+            data: {
+              status: 'failed',
+              error_message: err.message,
+            },
+          });
+        } catch (rollbackError: unknown) {
+          // Log rollback failure but still throw the original SQS error
+          // Transaction will remain in 'queued' state and can be cleaned up later
+          const rbErr = rollbackError as Error;
+          this.logger.error(
+            `Rollback failed for txId=${transactionId}: ${rbErr.message}. ` +
+              `Transaction remains in 'queued' state and may require manual cleanup.`,
+          );
+        }
 
         throw new ServiceUnavailableException('Failed to queue transaction: SQS unavailable');
       }
@@ -162,13 +172,23 @@ export class QueueService {
         const err = sqsError as Error;
         this.logger.error(`SQS send failed for txId=${transactionId}: ${err.message}`);
 
-        await this.prisma.transaction.update({
-          where: { id: transactionId },
-          data: {
-            status: 'failed',
-            error_message: err.message,
-          },
-        });
+        try {
+          await this.prisma.transaction.update({
+            where: { id: transactionId },
+            data: {
+              status: 'failed',
+              error_message: err.message,
+            },
+          });
+        } catch (rollbackError: unknown) {
+          // Log rollback failure but still throw the original SQS error
+          // Transaction will remain in 'queued' state and can be cleaned up later
+          const rbErr = rollbackError as Error;
+          this.logger.error(
+            `Rollback failed for txId=${transactionId}: ${rbErr.message}. ` +
+              `Transaction remains in 'queued' state and may require manual cleanup.`,
+          );
+        }
 
         throw new ServiceUnavailableException('Failed to queue transaction: SQS unavailable');
       }

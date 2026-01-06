@@ -147,6 +147,37 @@ export class ConsumerService implements OnModuleInit, OnModuleDestroy {
         return;
       }
 
+      // CRITICAL: Check if OZ Relayer TX was already submitted (race condition prevention)
+      // If ozRelayerTxId exists, the TX was submitted but confirmation polling failed
+      // In this case, we should only poll for status, not re-submit
+      if (transaction?.ozRelayerTxId) {
+        this.logger.log(
+          `Transaction ${transactionId} already submitted to OZ Relayer (${transaction.ozRelayerTxId}), polling for status`,
+        );
+        const result = await this.relayerClient.pollExistingTransaction(
+          transaction.ozRelayerTxId,
+        );
+
+        await this.prisma.transaction.update({
+          where: { id: transactionId },
+          data: {
+            status: 'confirmed',
+            hash: result.txHash,
+            result,
+          },
+        });
+
+        await this.sqsAdapter.deleteMessage(ReceiptHandle);
+        this.logger.log(`Message processed successfully (resumed): ${transactionId}`);
+        return;
+      }
+
+      // Mark as processing to prevent race conditions
+      await this.prisma.transaction.update({
+        where: { id: transactionId },
+        data: { status: 'processing' },
+      });
+
       // Send to OZ Relayer based on transaction type
       let result: any;
 
@@ -171,6 +202,7 @@ export class ConsumerService implements OnModuleInit, OnModuleDestroy {
         data: {
           status: 'confirmed',
           hash: result.txHash, // Store actual tx hash in hash column
+          ozRelayerTxId: result.transactionId, // Store OZ Relayer's TX ID for idempotency
           result,
         },
       });

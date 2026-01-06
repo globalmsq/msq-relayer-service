@@ -127,19 +127,27 @@ export class OzRelayerClient {
    * Waits for the transaction to be confirmed with an actual hash
    *
    * @param ozTxId - OZ Relayer's transaction ID
-   * @param maxAttempts - Maximum polling attempts (default: 30)
-   * @param delayMs - Delay between attempts in ms (default: 500)
+   * @param maxAttempts - Maximum polling attempts (from config or default: 30)
+   * @param delayMs - Delay between attempts in ms (from config or default: 500)
    * @returns Transaction status with hash
    */
   private async pollForConfirmation(
     ozTxId: string,
-    maxAttempts: number = 30,
-    delayMs: number = 500,
+    maxAttempts?: number,
+    delayMs?: number,
   ): Promise<any> {
+    // Use config values if not explicitly provided
+    const pollingConfig = this.configService.get<{
+      maxAttempts: number;
+      delayMs: number;
+    }>('relayer.polling');
+    const actualMaxAttempts =
+      maxAttempts ?? pollingConfig?.maxAttempts ?? 30;
+    const actualDelayMs = delayMs ?? pollingConfig?.delayMs ?? 500;
     const relayerId = await this.getRelayerId();
     const endpoint = `${this.baseUrl}/api/v1/relayers/${relayerId}/transactions/${ozTxId}`;
 
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    for (let attempt = 0; attempt < actualMaxAttempts; attempt++) {
       try {
         const response = await axios.get(endpoint, {
           headers: {
@@ -167,7 +175,7 @@ export class OzRelayerClient {
         // Log progress every 5 attempts
         if (attempt % 5 === 0) {
           this.logger.debug(
-            `Polling OZ Relayer [${attempt + 1}/${maxAttempts}]: ${ozTxId} status=${status}`,
+            `Polling OZ Relayer [${attempt + 1}/${actualMaxAttempts}]: ${ozTxId} status=${status}`,
           );
         }
       } catch (error) {
@@ -178,13 +186,13 @@ export class OzRelayerClient {
       }
 
       // Wait before next poll
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      await new Promise((resolve) => setTimeout(resolve, actualDelayMs));
     }
 
     // Return last known state if max attempts reached
     this.logger.warn(`Max polling attempts reached for ${ozTxId}`);
     throw new Error(
-      `Transaction ${ozTxId} did not reach terminal status after ${maxAttempts} attempts`,
+      `Transaction ${ozTxId} did not reach terminal status after ${actualMaxAttempts} attempts`,
     );
   }
 
@@ -339,5 +347,20 @@ export class OzRelayerClient {
       );
       throw error;
     }
+  }
+
+  /**
+   * Poll for an existing OZ Relayer transaction (for recovery/retry scenarios)
+   *
+   * SPEC-QUEUE-001: Race condition prevention
+   * When a message is reprocessed and ozRelayerTxId exists in DB,
+   * this method polls for the existing transaction status instead of re-submitting.
+   *
+   * @param ozTxId - OZ Relayer's internal transaction ID
+   * @returns Transaction status with hash
+   */
+  async pollExistingTransaction(ozTxId: string): Promise<any> {
+    this.logger.log(`Polling existing OZ Relayer transaction: ${ozTxId}`);
+    return await this.pollForConfirmation(ozTxId);
   }
 }

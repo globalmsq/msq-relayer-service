@@ -126,6 +126,7 @@ describe("StatusService", () => {
         request: null,
         result: null,
         error_message: null,
+        ozRelayerTxId: null,
       };
 
       jest.spyOn(redisService, "get").mockResolvedValueOnce(null);
