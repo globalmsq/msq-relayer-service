@@ -189,6 +189,19 @@ export class OzRelayerClient {
   }
 
   /**
+   * Invalidate cached relayer ID on specific errors
+   * Called when API returns 404, indicating relayer may have been redeployed
+   */
+  private invalidateRelayerIdCache(error: AxiosError): void {
+    if (error.response?.status === 404) {
+      this.logger.warn(
+        'Received 404 error - invalidating cached relayer ID (relayer may have been redeployed)',
+      );
+      this.relayerId = null;
+    }
+  }
+
+  /**
    * Send direct transaction to OZ Relayer and wait for confirmation
    */
   async sendDirectTransaction(request: {
@@ -198,34 +211,41 @@ export class OzRelayerClient {
     gasLimit?: string;
     speed?: string;
   }): Promise<any> {
-    const relayerId = await this.getRelayerId();
-    const endpoint = `${this.baseUrl}/api/v1/relayers/${relayerId}/transactions`;
+    try {
+      const relayerId = await this.getRelayerId();
+      const endpoint = `${this.baseUrl}/api/v1/relayers/${relayerId}/transactions`;
 
-    this.logger.debug(`Sending direct TX to OZ Relayer: ${endpoint}`);
+      this.logger.debug(`Sending direct TX to OZ Relayer: ${endpoint}`);
 
-    const ozRequest = {
-      to: request.to,
-      data: request.data,
-      value: request.value ? parseInt(request.value, 10) : 0,
-      gas_limit: request.gasLimit ? parseInt(request.gasLimit, 10) : 100000,
-      speed: request.speed || 'average',
-    };
+      const ozRequest = {
+        to: request.to,
+        data: request.data,
+        value: request.value ? parseInt(request.value, 10) : 0,
+        gas_limit: request.gasLimit ? parseInt(request.gasLimit, 10) : 100000,
+        speed: request.speed || 'average',
+      };
 
-    const response = await axios.post(endpoint, ozRequest, {
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.apiKey}`,
-      },
-      timeout: 30000,
-    });
+      const response = await axios.post(endpoint, ozRequest, {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+        timeout: 30000,
+      });
 
-    const txData = response.data.data;
-    const ozTxId = txData.id;
+      const txData = response.data.data;
+      const ozTxId = txData.id;
 
-    this.logger.log(`Direct TX submitted to OZ Relayer: ${ozTxId}`);
+      this.logger.log(`Direct TX submitted to OZ Relayer: ${ozTxId}`);
 
-    // Poll until confirmed with hash (Hardhat mines immediately)
-    return await this.pollForConfirmation(ozTxId);
+      // Poll until confirmed with hash (Hardhat mines immediately)
+      return await this.pollForConfirmation(ozTxId);
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        this.invalidateRelayerIdCache(error);
+      }
+      throw error;
+    }
   }
 
   /**
@@ -246,46 +266,53 @@ export class OzRelayerClient {
     },
     forwarderAddress: string,
   ): Promise<any> {
-    const relayerId = await this.getRelayerId();
-    const endpoint = `${this.baseUrl}/api/v1/relayers/${relayerId}/transactions`;
+    try {
+      const relayerId = await this.getRelayerId();
+      const endpoint = `${this.baseUrl}/api/v1/relayers/${relayerId}/transactions`;
 
-    this.logger.debug(`Sending gasless TX to OZ Relayer: ${endpoint}`);
-    this.logger.debug(`Forwarder address: ${forwarderAddress}`);
+      this.logger.debug(`Sending gasless TX to OZ Relayer: ${endpoint}`);
+      this.logger.debug(`Forwarder address: ${forwarderAddress}`);
 
-    // Build the execute() calldata
-    const executeCalldata = this.buildForwarderExecuteCalldata(
-      request.request,
-      request.signature,
-    );
+      // Build the execute() calldata
+      const executeCalldata = this.buildForwarderExecuteCalldata(
+        request.request,
+        request.signature,
+      );
 
-    // Calculate gas limit for forwarder call (inner gas + overhead)
-    const innerGas = BigInt(request.request.gas);
-    const forwarderOverhead = BigInt(50000); // Forwarder execution overhead
-    const totalGas = innerGas + forwarderOverhead;
+      // Calculate gas limit for forwarder call (inner gas + overhead)
+      const innerGas = BigInt(request.request.gas);
+      const forwarderOverhead = BigInt(50000); // Forwarder execution overhead
+      const totalGas = innerGas + forwarderOverhead;
 
-    const ozRequest = {
-      to: forwarderAddress,
-      data: executeCalldata,
-      value: parseInt(request.request.value, 10),
-      gas_limit: Number(totalGas),
-      speed: 'average',
-    };
+      const ozRequest = {
+        to: forwarderAddress,
+        data: executeCalldata,
+        value: parseInt(request.request.value, 10),
+        gas_limit: Number(totalGas),
+        speed: 'average',
+      };
 
-    const response = await axios.post(endpoint, ozRequest, {
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.apiKey}`,
-      },
-      timeout: 30000,
-    });
+      const response = await axios.post(endpoint, ozRequest, {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+        timeout: 30000,
+      });
 
-    const txData = response.data.data;
-    const ozTxId = txData.id;
+      const txData = response.data.data;
+      const ozTxId = txData.id;
 
-    this.logger.log(`Gasless TX submitted to OZ Relayer: ${ozTxId}`);
+      this.logger.log(`Gasless TX submitted to OZ Relayer: ${ozTxId}`);
 
-    // Poll until confirmed with hash (Hardhat mines immediately)
-    return await this.pollForConfirmation(ozTxId);
+      // Poll until confirmed with hash (Hardhat mines immediately)
+      return await this.pollForConfirmation(ozTxId);
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        this.invalidateRelayerIdCache(error);
+      }
+      throw error;
+    }
   }
 
   /**

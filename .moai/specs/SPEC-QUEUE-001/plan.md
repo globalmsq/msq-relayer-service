@@ -661,9 +661,14 @@ async sendDirectTransaction(@Body() dto: DirectTxRequestDto) {
 
 **작업**:
 - `createPendingTransaction()`: MySQL에 pending 상태로 저장
-- `processTransaction()`: Consumer에서 호출, OZ Relayer 전송 후 상태 업데이트
+- 트랜잭션 처리는 독립적인 `queue-consumer` 서비스에서 수행
+
+> **구현 참고**: 실제 구현에서 `queue-consumer`는 독립적인 NestJS 서비스로 배포됩니다.
+> `relay-api`의 서비스를 직접 호출하지 않고, 자체 `OzRelayerClient`를 통해 OZ Relayer와 통신합니다.
+> 이는 마이크로서비스 아키텍처의 분리 원칙을 따릅니다.
 
 ```typescript
+// relay-api: 트랜잭션 생성 및 큐 전송만 담당
 async createPendingTransaction(dto: DirectTxRequestDto): Promise<Transaction> {
   return this.transactionRepository.save({
     status: 'pending',
@@ -672,18 +677,8 @@ async createPendingTransaction(dto: DirectTxRequestDto): Promise<Transaction> {
   });
 }
 
-async processTransaction(transactionId: string): Promise<void> {
-  const transaction = await this.transactionRepository.findOne({ id: transactionId });
-
-  // OZ Relayer 전송 (기존 로직)
-  const result = await this.relayToOzRelayer(transaction.request);
-
-  // 상태 업데이트
-  await this.transactionRepository.update(transactionId, {
-    status: 'success',
-    result,
-  });
-}
+// queue-consumer (별도 서비스): 메시지 수신 및 OZ Relayer 전송 담당
+// packages/queue-consumer/src/consumer.service.ts 참조
 ```
 
 #### 5.3 GaslessController/Service 동일 패턴 적용

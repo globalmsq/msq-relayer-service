@@ -240,7 +240,8 @@ OZ Relayer 전송이 3회 연속 실패하면 메시지가 DLQ (Dead Letter Queu
 ```bash
 awslocal sqs receive-message \
   --queue-url http://localhost:4566/000000000000/relay-transactions-dlq \
-  --max-number-of-messages 1
+  --max-number-of-messages 1 \
+  --attribute-names ApproximateReceiveCount
 ```
 
 **기대 메시지**:

@@ -345,7 +345,7 @@ X-API-Key: {api-key}
   "to": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
   "data": "0x",
   "value": "0",
-  "gas": "21000",
+  "gasLimit": "21000",
   "speed": "fast"
 }
 
