@@ -2,12 +2,16 @@ import { Module } from "@nestjs/common";
 import { HttpModule } from "@nestjs/axios";
 import { TerminusModule } from "@nestjs/terminus";
 import { HealthController } from "./health.controller";
-import { OzRelayerHealthIndicator, RedisHealthIndicator } from "./indicators";
+import {
+  OzRelayerHealthIndicator,
+  RedisHealthIndicator,
+  SqsHealthIndicator,
+} from "./indicators";
 
 @Module({
   imports: [HttpModule, TerminusModule],
   controllers: [HealthController],
-  providers: [OzRelayerHealthIndicator, RedisHealthIndicator],
-  exports: [OzRelayerHealthIndicator, RedisHealthIndicator],
+  providers: [OzRelayerHealthIndicator, RedisHealthIndicator, SqsHealthIndicator],
+  exports: [OzRelayerHealthIndicator, RedisHealthIndicator, SqsHealthIndicator],
 })
 export class HealthModule {}

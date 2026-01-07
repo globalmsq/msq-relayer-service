@@ -13,17 +13,30 @@ datasource db {
 model Transaction {
   id            String    @id @default(uuid())
   hash          String?   @unique
-  status        String    // pending, sent, submitted, inmempool, mined, confirmed, failed
+  status        String    // pending, sent, submitted, inmempool, mined, confirmed, failed, queued, processing
   from          String?
   to            String?
   value         String?
   data          String?   @db.Text
+
+  // SPEC-QUEUE-001: SQS Queue System Fields
+  type          String?   // 'direct' | 'gasless'
+  request       Json?     // Original request data (DirectTxRequestDto, GaslessTxRequestDto)
+  result        Json?     // OZ Relayer response (hash, transactionId, etc.)
+  error_message String?   @db.Text // Error message on failure
+
+  // SPEC-QUEUE-001: OZ Relayer tracking for idempotency
+  // Stores OZ Relayer's internal transaction ID to prevent duplicate submissions
+  // If set, consumer should poll for status instead of re-submitting
+  ozRelayerTxId String?   @unique @map("oz_relayer_tx_id")
+
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   confirmedAt   DateTime?
 
   @@index([status])
   @@index([hash])
+  @@index([type])
   @@index([createdAt])
   @@map("transactions")
 }

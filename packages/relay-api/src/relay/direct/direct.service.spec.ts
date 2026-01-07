@@ -1,24 +1,25 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { DirectService } from "./direct.service";
-import {
-  OzRelayerService,
-  DirectTxResponse,
-} from "../../oz-relayer/oz-relayer.service";
-import { PrismaService } from "../../prisma/prisma.service";
-import { RedisService } from "../../redis/redis.service";
+import { QueueService } from "../../queue/queue.service";
 import { DirectTxRequestDto } from "../dto/direct-tx-request.dto";
 
+/**
+ * DirectService Unit Tests
+ *
+ * SPEC-PROXY-001: Direct Transaction API
+ * SPEC-QUEUE-001: AWS SQS Queue System - Async Processing
+ *
+ * Tests for DirectService delegation to QueueService
+ */
 describe("DirectService", () => {
   let service: DirectService;
-  let ozRelayerService: OzRelayerService;
-  let prismaService: PrismaService;
-  let redisService: RedisService;
+  let queueService: QueueService;
 
-  const mockDirectTxResponse: DirectTxResponse = {
-    transactionId: "tx_abc123def456",
-    hash: "0xabc123def456789abc123def456789abc123def456789abc123def456789abc1",
-    status: "pending",
-    createdAt: "2025-12-19T10:30:00.000Z",
+  const mockQueuedResponse = {
+    transactionId: "550e8400-e29b-12d3-a456-426614174000",
+    hash: null,
+    status: "queued",
+    createdAt: "2025-01-05T10:30:00.000Z",
   };
 
   beforeEach(async () => {
@@ -26,34 +27,16 @@ describe("DirectService", () => {
       providers: [
         DirectService,
         {
-          provide: OzRelayerService,
+          provide: QueueService,
           useValue: {
-            sendTransaction: jest.fn(),
-          },
-        },
-        {
-          provide: PrismaService,
-          useValue: {
-            transaction: {
-              create: jest.fn().mockResolvedValue({}),
-              findUnique: jest.fn().mockResolvedValue(null),
-            },
-          },
-        },
-        {
-          provide: RedisService,
-          useValue: {
-            get: jest.fn().mockResolvedValue(null),
-            set: jest.fn().mockResolvedValue(undefined),
+            sendDirectTransaction: jest.fn(),
           },
         },
       ],
     }).compile();
 
     service = module.get<DirectService>(DirectService);
-    ozRelayerService = module.get<OzRelayerService>(OzRelayerService);
-    prismaService = module.get<PrismaService>(PrismaService);
-    redisService = module.get<RedisService>(RedisService);
+    queueService = module.get<QueueService>(QueueService);
   });
 
   it("should be defined", () => {
@@ -61,7 +44,8 @@ describe("DirectService", () => {
   });
 
   describe("sendTransaction", () => {
-    it("should send transaction and return response", async () => {
+    it("should delegate to QueueService and return queued response", async () => {
+      // Arrange
       const requestDto: DirectTxRequestDto = {
         to: "0x1234567890123456789012345678901234567890",
         data: "0xabcdef",
@@ -71,110 +55,53 @@ describe("DirectService", () => {
       };
 
       jest
-        .spyOn(ozRelayerService, "sendTransaction")
-        .mockResolvedValueOnce(mockDirectTxResponse);
+        .spyOn(queueService, "sendDirectTransaction")
+        .mockResolvedValueOnce(mockQueuedResponse);
 
+      // Act
       const result = await service.sendTransaction(requestDto);
 
-      expect(result.transactionId).toEqual(mockDirectTxResponse.transactionId);
-      expect(result.hash).toEqual(mockDirectTxResponse.hash);
-      expect(result.status).toEqual(mockDirectTxResponse.status);
-      expect(result.createdAt).toEqual(mockDirectTxResponse.createdAt);
-      expect(ozRelayerService.sendTransaction).toHaveBeenCalledWith({
-        to: requestDto.to,
-        data: requestDto.data,
-        value: requestDto.value,
-        gasLimit: requestDto.gasLimit,
-        speed: requestDto.speed,
-      });
-    });
-
-    it("should store transaction in Redis and MySQL after send", async () => {
-      const requestDto: DirectTxRequestDto = {
-        to: "0x1234567890123456789012345678901234567890",
-        data: "0xabcdef",
-        value: "1000000000000000000",
-        gasLimit: "21000",
-        speed: "fast",
-      };
-
-      jest
-        .spyOn(ozRelayerService, "sendTransaction")
-        .mockResolvedValueOnce(mockDirectTxResponse);
-
-      await service.sendTransaction(requestDto);
-
-      expect(redisService.set).toHaveBeenCalledWith(
-        `tx:status:${mockDirectTxResponse.transactionId}`,
-        expect.objectContaining({
-          transactionId: mockDirectTxResponse.transactionId,
-          status: mockDirectTxResponse.status,
-        }),
-        600,
-      );
-
-      expect(prismaService.transaction.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          id: mockDirectTxResponse.transactionId,
-          status: mockDirectTxResponse.status,
-          to: requestDto.to,
-        }),
-      });
+      // Assert
+      expect(result.transactionId).toEqual(mockQueuedResponse.transactionId);
+      expect(result.hash).toBeNull();
+      expect(result.status).toEqual("queued");
+      expect(result.createdAt).toEqual(mockQueuedResponse.createdAt);
+      expect(queueService.sendDirectTransaction).toHaveBeenCalledWith(requestDto);
     });
 
     it("should handle missing optional fields", async () => {
+      // Arrange
       const requestDto: DirectTxRequestDto = {
         to: "0x1234567890123456789012345678901234567890",
         data: "0xabcdef",
       };
 
       jest
-        .spyOn(ozRelayerService, "sendTransaction")
-        .mockResolvedValueOnce(mockDirectTxResponse);
+        .spyOn(queueService, "sendDirectTransaction")
+        .mockResolvedValueOnce(mockQueuedResponse);
 
+      // Act
       const result = await service.sendTransaction(requestDto);
 
-      expect(result.transactionId).toEqual(mockDirectTxResponse.transactionId);
-      expect(ozRelayerService.sendTransaction).toHaveBeenCalledWith({
-        to: requestDto.to,
-        data: requestDto.data,
-        value: undefined,
-        gasLimit: undefined,
-        speed: undefined,
-      });
+      // Assert
+      expect(result.transactionId).toEqual(mockQueuedResponse.transactionId);
+      expect(queueService.sendDirectTransaction).toHaveBeenCalledWith(requestDto);
     });
 
-    it("should propagate OzRelayerService errors", async () => {
+    it("should propagate QueueService errors", async () => {
+      // Arrange
       const requestDto: DirectTxRequestDto = {
         to: "0x1234567890123456789012345678901234567890",
         data: "0xabcdef",
       };
 
-      const error = new Error("OZ Relayer service unavailable");
+      const error = new Error("Queue service unavailable");
       jest
-        .spyOn(ozRelayerService, "sendTransaction")
+        .spyOn(queueService, "sendDirectTransaction")
         .mockRejectedValueOnce(error);
 
+      // Act & Assert
       await expect(service.sendTransaction(requestDto)).rejects.toThrow(error);
-    });
-
-    it("should not fail if storage fails but OZ Relayer succeeds", async () => {
-      const requestDto: DirectTxRequestDto = {
-        to: "0x1234567890123456789012345678901234567890",
-        data: "0xabcdef",
-      };
-
-      jest
-        .spyOn(ozRelayerService, "sendTransaction")
-        .mockResolvedValueOnce(mockDirectTxResponse);
-      jest
-        .spyOn(prismaService.transaction, "create")
-        .mockRejectedValueOnce(new Error("DB Error"));
-
-      const result = await service.sendTransaction(requestDto);
-
-      // Should still return the response even if storage failed
-      expect(result.transactionId).toEqual(mockDirectTxResponse.transactionId);
     });
   });
 });
