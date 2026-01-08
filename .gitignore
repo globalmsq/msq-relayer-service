@@ -199,6 +199,7 @@ docker/keys/
 
 # Sample keys included in Git (for development)
 !docker/keys-example/
+!docker/keys-example/**
 
 # ===========================================
 # Project-Specific: Hardhat (packages/contracts)

@@ -23,10 +23,13 @@ A self-hosted blockchain transaction relay system built on OZ Relayer (Rust) wit
 ### Run Services
 
 ```bash
-# Start all services
+# 1. Copy keystore files for local development
+cp -R docker/keys-example docker/keys
+
+# 2. Start all services
 docker compose -f docker/docker-compose.yaml up -d
 
-# Health check
+# 3. Health check
 curl http://localhost:3000/api/v1/health
 
 # View logs
