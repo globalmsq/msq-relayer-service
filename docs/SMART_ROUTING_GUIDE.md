@@ -37,9 +37,9 @@ The system manages 3 OZ Relayer instances deployed with unique configurations:
 
 | Relayer | URL | Redis Prefix | Signing Key | Status |
 |---------|-----|--------------|-------------|--------|
-| relayer-1 | http://oz-relayer-1:3000 | relayer-1 | key1.json | Active |
-| relayer-2 | http://oz-relayer-2:3000 | relayer-2 | key2.json | Active |
-| relayer-3 | http://oz-relayer-3:3000 | relayer-3 | key3.json | Active |
+| relayer-1 | http://oz-relayer-1:8080 | relayer-1 | key1.json | Active |
+| relayer-2 | http://oz-relayer-2:8080 | relayer-2 | key2.json | Active |
+| relayer-3 | http://oz-relayer-3:8080 | relayer-3 | key3.json | Active |
 
 ---
 

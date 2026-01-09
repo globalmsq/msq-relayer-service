@@ -195,7 +195,8 @@ export class ConsumerService implements OnModuleInit, OnModuleDestroy {
       });
 
       // FR-001: Smart Routing - Get least busy relayer
-      const { url: relayerUrl } = await this.relayerRouter.getAvailableRelayer();
+      const { url: relayerUrl, relayerId } =
+        await this.relayerRouter.getAvailableRelayer();
       this.logger.log(`[Smart Routing] Selected relayer: ${relayerUrl}`);
 
       // FR-002: Fire-and-Forget - Send TX and return immediately
@@ -206,6 +207,7 @@ export class ConsumerService implements OnModuleInit, OnModuleDestroy {
         result = await this.relayerClient.sendDirectTransactionAsync(
           directMessage.request,
           relayerUrl,
+          relayerId, // Optimization: Pass relayerId to avoid redundant API call
         );
       } else if (type === 'gasless') {
         const gaslessMessage = messageBody as GaslessMessage;
@@ -213,6 +215,7 @@ export class ConsumerService implements OnModuleInit, OnModuleDestroy {
           gaslessMessage.request,
           gaslessMessage.forwarderAddress,
           relayerUrl,
+          relayerId, // Optimization: Pass relayerId to avoid redundant API call
         );
       } else {
         throw new Error(`Unknown transaction type: ${type}`);

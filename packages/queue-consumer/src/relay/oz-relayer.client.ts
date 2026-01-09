@@ -372,6 +372,7 @@ export class OzRelayerClient {
    *
    * @param request - Direct transaction request
    * @param relayerUrl - Target relayer URL (from Smart Routing)
+   * @param providedRelayerId - Optional relayer ID (if already known, skips API call)
    * @returns OZ Relayer's transaction ID (for tracking)
    */
   async sendDirectTransactionAsync(
@@ -383,10 +384,12 @@ export class OzRelayerClient {
       speed?: string;
     },
     relayerUrl: string,
+    providedRelayerId?: string,
   ): Promise<{ transactionId: string; relayerUrl: string }> {
     try {
-      // Get relayer ID from the specific relayer
-      const relayerId = await this.getRelayerIdFromUrl(relayerUrl);
+      // Use provided relayerId or fetch from API
+      const relayerId =
+        providedRelayerId || (await this.getRelayerIdFromUrl(relayerUrl));
       const endpoint = `${relayerUrl}/api/v1/relayers/${relayerId}/transactions`;
 
       this.logger.debug(`[Fire-and-Forget] Sending direct TX to: ${endpoint}`);
@@ -436,6 +439,7 @@ export class OzRelayerClient {
    * @param request - Gasless transaction request
    * @param forwarderAddress - ERC2771Forwarder contract address
    * @param relayerUrl - Target relayer URL (from Smart Routing)
+   * @param providedRelayerId - Optional relayer ID (if already known, skips API call)
    * @returns OZ Relayer's transaction ID (for tracking)
    */
   async sendGaslessTransactionAsync(
@@ -453,10 +457,12 @@ export class OzRelayerClient {
     },
     forwarderAddress: string,
     relayerUrl: string,
+    providedRelayerId?: string,
   ): Promise<{ transactionId: string; relayerUrl: string }> {
     try {
-      // Get relayer ID from the specific relayer
-      const relayerId = await this.getRelayerIdFromUrl(relayerUrl);
+      // Use provided relayerId or fetch from API
+      const relayerId =
+        providedRelayerId || (await this.getRelayerIdFromUrl(relayerUrl));
       const endpoint = `${relayerUrl}/api/v1/relayers/${relayerId}/transactions`;
 
       this.logger.debug(`[Fire-and-Forget] Sending gasless TX to: ${endpoint}`);

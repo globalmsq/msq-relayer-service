@@ -21,7 +21,7 @@ x-relayer-common: &relayer-common
     start_period: 30s
 
 x-relayer-env: &relayer-env
-  RUST_LOG: trace
+  RUST_LOG: info
   RELAY_API_KEY: ${RELAY_API_KEY:-local-dev-api-key}
   KEYSTORE_PASSPHRASE: ${KEYSTORE_PASSPHRASE:-hardhat-test-passphrase}
   WEBHOOK_SIGNING_KEY: ${WEBHOOK_SIGNING_KEY:-local-dev-webhook-signing-key-32ch}

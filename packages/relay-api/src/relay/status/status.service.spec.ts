@@ -49,6 +49,7 @@ describe("StatusService", () => {
           provide: OzRelayerService,
           useValue: {
             getRelayerId: jest.fn(),
+            getRelayerIdFromUrl: jest.fn(),
           },
         },
         {
@@ -204,6 +205,10 @@ describe("StatusService", () => {
         .spyOn(prismaService.transaction, "findUnique")
         .mockResolvedValueOnce(storedData);
       jest.spyOn(ozRelayerService, "getRelayerId").mockResolvedValue(relayerId);
+      // SPEC-ROUTING-001 FIX: Mock getRelayerIdFromUrl for multi-relayer support
+      jest
+        .spyOn(ozRelayerService, "getRelayerIdFromUrl")
+        .mockResolvedValue(relayerId);
       jest.spyOn(configService, "get").mockImplementation((key: string) => {
         if (key === "OZ_RELAYER_URL") return relayerUrl;
         if (key === "OZ_RELAYER_API_KEY") return apiKey;
@@ -368,6 +373,10 @@ describe("StatusService", () => {
         .spyOn(prismaService.transaction, "findUnique")
         .mockResolvedValueOnce(storedData);
       jest.spyOn(ozRelayerService, "getRelayerId").mockResolvedValue(relayerId);
+      // SPEC-ROUTING-001 FIX: Mock getRelayerIdFromUrl for multi-relayer support
+      jest
+        .spyOn(ozRelayerService, "getRelayerIdFromUrl")
+        .mockResolvedValue(relayerId);
       jest.spyOn(configService, "get").mockImplementation((key: string) => {
         if (key === "OZ_RELAYER_URL") return relayerUrl;
         if (key === "OZ_RELAYER_API_KEY") return apiKey;

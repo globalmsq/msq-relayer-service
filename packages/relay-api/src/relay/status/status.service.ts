@@ -186,7 +186,6 @@ export class StatusService {
     ozRelayerUrl?: string | null,
   ): Promise<TxStatusResponseDto> {
     try {
-      const relayerId = await this.ozRelayerService.getRelayerId();
       // SPEC-ROUTING-001: Use stored ozRelayerUrl if available, otherwise fall back to env
       const relayerUrl =
         ozRelayerUrl ||
@@ -194,6 +193,12 @@ export class StatusService {
           "OZ_RELAYER_URL",
           "http://oz-relayer-lb:8080",
         );
+      // SPEC-ROUTING-001 FIX: Get relayer ID from the specific URL
+      // Previously used getRelayerId() which always returned default relayer's ID
+      // This caused mismatch when querying oz-relayer-2 with oz-relayer-1's ID
+      const relayerId = ozRelayerUrl
+        ? await this.ozRelayerService.getRelayerIdFromUrl(relayerUrl)
+        : await this.ozRelayerService.getRelayerId();
       const apiKey = this.configService.get<string>(
         "OZ_RELAYER_API_KEY",
         "oz-relayer-shared-api-key-local-dev",

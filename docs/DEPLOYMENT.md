@@ -716,7 +716,7 @@ The queue-consumer must be aware of all 3 relayer instances:
 # packages/queue-consumer/.env
 
 # Relayer URLs (comma-separated)
-RELAYER_URLS=http://oz-relayer-1:3000,http://oz-relayer-2:3000,http://oz-relayer-3:3000
+OZ_RELAYER_URLS=http://oz-relayer-1:8080,http://oz-relayer-2:8080,http://oz-relayer-3:8080
 
 # Smart Routing Configuration
 SMART_ROUTING_ENABLED=true
@@ -731,9 +731,9 @@ FALLBACK_MODE=round-robin
 
 | Relayer | Container Port | Host Port | URL |
 |---------|----------------|-----------|-----|
-| relayer-1 | 3000 | 8081 | http://oz-relayer-1:3000 |
-| relayer-2 | 3000 | 8082 | http://oz-relayer-2:3000 |
-| relayer-3 | 3000 | 8083 | http://oz-relayer-3:3000 |
+| relayer-1 | 8080 | 8081 | http://oz-relayer-1:8080 |
+| relayer-2 | 8080 | 8082 | http://oz-relayer-2:8080 |
+| relayer-3 | 8080 | 8083 | http://oz-relayer-3:8080 |
 
 ### Health Check Verification
 

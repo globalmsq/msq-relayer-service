@@ -140,10 +140,12 @@ describe('ConsumerService (Fire-and-Forget Pattern)', () => {
 
       // FR-001: Smart Routing - Should call getAvailableRelayer
       expect(relayerRouter.getAvailableRelayer).toHaveBeenCalled();
-      // Fire-and-Forget: Should call async method with selected relayer URL
+      // Fire-and-Forget: Should call async method with selected relayer URL and relayerId
+      // SPEC-ROUTING-001 FIX: Now passes relayerId to avoid redundant API call
       expect(relayerClient.sendDirectTransactionAsync).toHaveBeenCalledWith(
         expect.any(Object),
         mockRelayerUrl,
+        'relayer-1-id',
       );
     });
 
@@ -380,10 +382,12 @@ describe('ConsumerService (Fire-and-Forget Pattern)', () => {
 
       await service.processMessages();
 
+      // SPEC-ROUTING-001 FIX: Now passes relayerId to avoid redundant API call
       expect(relayerClient.sendGaslessTransactionAsync).toHaveBeenCalledWith(
         expect.any(Object),
         forwarderAddress,
         mockRelayerUrl,
+        'relayer-1-id',
       );
       expect(sqsAdapter.deleteMessage).toHaveBeenCalled();
     });
