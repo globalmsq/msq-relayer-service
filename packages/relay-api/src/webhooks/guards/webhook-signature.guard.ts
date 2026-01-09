@@ -31,12 +31,28 @@ export class WebhookSignatureGuard implements CanActivate {
 
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<Request>();
-    const signature = request.headers["x-oz-signature"] as string;
+
+    // DEBUG: Log all incoming headers to find the correct signature header name
+    this.logger.debug(
+      `Incoming webhook headers: ${JSON.stringify(request.headers, null, 2)}`,
+    );
+
+    // Try multiple possible header names (OZ Relayer might use different names)
+    const signature =
+      (request.headers["x-oz-signature"] as string) ||
+      (request.headers["x-signature"] as string) ||
+      (request.headers["x-webhook-signature"] as string) ||
+      (request.headers["x-hub-signature-256"] as string) ||
+      (request.headers["signature"] as string);
 
     if (!signature) {
-      this.logger.warn("Webhook request missing X-OZ-Signature header");
+      this.logger.warn(
+        `Webhook request missing signature header. Available headers: ${Object.keys(request.headers).join(", ")}`,
+      );
       throw new UnauthorizedException("Missing webhook signature");
     }
+
+    this.logger.debug(`Found signature in header: ${signature.substring(0, 20)}...`);
 
     const signingKey = this.configService.get<string>("WEBHOOK_SIGNING_KEY");
 
@@ -46,10 +62,11 @@ export class WebhookSignatureGuard implements CanActivate {
     }
 
     const payload = JSON.stringify(request.body);
+    // OZ Relayer sends Base64 encoded HMAC-SHA256 signature
     const expectedSignature = crypto
       .createHmac("sha256", signingKey)
       .update(payload)
-      .digest("hex");
+      .digest("base64");
 
     // Use timing-safe comparison to prevent timing attacks
     const isValid = this.timingSafeEqual(signature, expectedSignature);

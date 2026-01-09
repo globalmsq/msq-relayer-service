@@ -28,10 +28,11 @@ describe("WebhookSignatureGuard", () => {
 
   const generateValidSignature = (body: object): string => {
     const payload = JSON.stringify(body);
+    // OZ Relayer sends Base64 encoded HMAC-SHA256 signature
     return crypto
       .createHmac("sha256", signingKey)
       .update(payload)
-      .digest("hex");
+      .digest("base64");
   };
 
   beforeEach(async () => {
